@@ -13,9 +13,18 @@ import (
 )
 
 func main() {
-	cfgPath := config.DefaultConfigPath
+	var cfgPath string
 	if len(os.Args) > 1 {
 		cfgPath = os.Args[1]
+	} else {
+		var err error
+		cfgPath, err = config.DefaultConfigPath()
+		if err != nil {
+			log.Fatalf("resolve config path: %v", err)
+		}
+		if err := config.WriteTemplate(cfgPath); err != nil {
+			log.Fatalf("write config template: %v", err)
+		}
 	}
 
 	cfg, err := config.Load(cfgPath)

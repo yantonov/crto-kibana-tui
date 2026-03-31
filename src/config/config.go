@@ -3,11 +3,29 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultConfigPath = "config.yaml"
+const configFileName = "config.yaml"
+
+// DefaultConfigPath returns the path to config.yaml next to the executable.
+func DefaultConfigPath() (string, error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("resolve executable: %w", err)
+	}
+	return filepath.Join(filepath.Dir(exe), configFileName), nil
+}
+
+// WriteTemplate writes a starter config.yaml to path if it does not already exist.
+func WriteTemplate(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil // already exists
+	}
+	return os.WriteFile(path, []byte(configTemplate), 0o644)
+}
 
 func Load(path string) (*Config, error) {
 	f, err := os.Open(path)
@@ -85,3 +103,42 @@ func replaceAll(s, old, new string) string {
 	}
 	return result
 }
+
+const configTemplate = `environments:
+  prod:
+    data_centers:
+      - dc1
+      - dc2
+  staging:
+    data_centers:
+      - dc1
+
+opensearch_url_template: "https://opensearch.{dc}.{env}.example.com"
+kibana_url_template: "https://kibana.{dc}.{env}.example.com"
+index_pattern: "logs-*"
+query_timeout_seconds: 10
+
+applications:
+  - my-app
+
+severity_levels:
+  - ERROR
+  - WARN
+  - INFO
+  - DEBUG
+
+timeframes:
+  - label: "15 minutes"
+    value: "15m"
+  - label: "1 hour"
+    value: "1h"
+  - label: "24 hours"
+    value: "24h"
+
+field_mapping:
+  timestamp: "@timestamp"
+  severity: "level"
+  application: "app"
+  trace_id: "trace_id"
+  message: "message"
+`
