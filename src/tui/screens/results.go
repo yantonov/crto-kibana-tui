@@ -226,7 +226,7 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 
 	const (
 		tsWidth  = 20
-		sevWidth = 8
+		sevWidth = 14
 		dcWidth  = 8
 		appWidth = 20
 		gaps     = 10

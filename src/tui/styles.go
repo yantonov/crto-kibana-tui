@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	// ColorPrimary is the main accent colour.
@@ -52,14 +56,16 @@ var (
 			Foreground(lipgloss.Color("#FFFFFF")).
 			Bold(true)
 
-	// SeverityStyles maps severity level names to their display style.
+	// SeverityStyles maps syslog severity names to their display style.
 	SeverityStyles = map[string]lipgloss.Style{
-		"FATAL": lipgloss.NewStyle().Foreground(ColorError).Bold(true),
-		"ERROR": lipgloss.NewStyle().Foreground(ColorError),
-		"WARN":  lipgloss.NewStyle().Foreground(ColorWarn),
-		"INFO":  lipgloss.NewStyle().Foreground(ColorInfo),
-		"DEBUG": lipgloss.NewStyle().Foreground(ColorMuted),
-		"TRACE": lipgloss.NewStyle().Foreground(ColorMuted),
+		"Emergency": lipgloss.NewStyle().Foreground(ColorError).Bold(true),
+		"Alert":     lipgloss.NewStyle().Foreground(ColorError).Bold(true),
+		"Critical":  lipgloss.NewStyle().Foreground(ColorError).Bold(true),
+		"Error":     lipgloss.NewStyle().Foreground(ColorError),
+		"Warning":   lipgloss.NewStyle().Foreground(ColorWarn),
+		"Notice":    lipgloss.NewStyle().Foreground(ColorInfo),
+		"Info":      lipgloss.NewStyle().Foreground(ColorInfo),
+		"Debug":     lipgloss.NewStyle().Foreground(ColorMuted),
 	}
 
 	// DCHealthOK is shown in the status bar for a responsive data center.
@@ -68,10 +74,14 @@ var (
 	DCHealthErr = lipgloss.NewStyle().Foreground(ColorError)
 )
 
-// SeverityStyle returns the style for the given severity, falling back to the
-// default terminal style when the level is not recognised.
+// SeverityStyle returns the style for the given severity label.
+// It handles both plain names ("Error") and "Name (N)" display labels.
 func SeverityStyle(level string) lipgloss.Style {
-	if s, ok := SeverityStyles[level]; ok {
+	name := level
+	if i := strings.Index(level, " ("); i >= 0 {
+		name = level[:i]
+	}
+	if s, ok := SeverityStyles[name]; ok {
 		return s
 	}
 	return lipgloss.NewStyle()

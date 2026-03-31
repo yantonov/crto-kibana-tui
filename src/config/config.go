@@ -111,12 +111,6 @@ query_timeout_seconds: 10
 applications:
   - my-app
 
-severity_levels:
-  - ERROR
-  - WARN
-  - INFO
-  - DEBUG
-
 timeframes:
   - label: "15 minutes"
     value: "15m"

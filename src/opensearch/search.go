@@ -98,9 +98,16 @@ func mapHit(hit Hit, dc, env string) models.LogEntry {
 
 	raw, _ := json.Marshal(src)
 
+	var severity string
+	if code, ok := intField(src, fieldSeverity); ok {
+		severity = models.SeverityLabel(code)
+	} else {
+		severity = stringField(src, fieldSeverity)
+	}
+
 	return models.LogEntry{
 		Timestamp:   parseTimestamp(stringField(src, fieldTimestamp)),
-		Severity:    stringField(src, fieldSeverity),
+		Severity:    severity,
 		Application: stringField(src, fieldApplication),
 		TraceID:     stringField(src, fieldTraceID),
 		Message:     stringField(src, fieldMessage),
@@ -117,6 +124,22 @@ func stringField(src map[string]interface{}, key string) string {
 		}
 	}
 	return ""
+}
+
+// intField reads a numeric field from an OpenSearch source map.
+// JSON numbers unmarshal as float64, so both float64 and int are handled.
+func intField(src map[string]interface{}, key string) (int, bool) {
+	v, ok := src[key]
+	if !ok {
+		return 0, false
+	}
+	switch n := v.(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	}
+	return 0, false
 }
 
 func parseTimestamp(s string) time.Time {

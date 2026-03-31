@@ -16,7 +16,7 @@ type LogEntry struct {
 
 // Filter holds all user-selected search parameters.
 type Filter struct {
-	Severity    string // empty = all
+	Severity    int    // SeverityAll (-1) = no filter; 0–7 = syslog level
 	Application string // empty = all
 	TraceID     string // empty = skip
 	Query       string // free-text Lucene/KQL query string

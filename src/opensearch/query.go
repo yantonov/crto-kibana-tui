@@ -38,7 +38,7 @@ func BuildQuery(f models.Filter, size int) map[string]interface{} {
 		},
 	}
 
-	if f.Severity != "" {
+	if f.Severity >= 0 {
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{fieldSeverity: f.Severity},
 		})

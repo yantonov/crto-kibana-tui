@@ -2,6 +2,7 @@ package screens
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -86,10 +87,10 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 		envOpts[i] = components.Option{Label: k, Value: k}
 	}
 
-	// Severity: "all" first, then levels from config.
+	// Severity: "all" first, then hardcoded syslog levels (Emergency→Debug).
 	sevOpts := []components.Option{{Label: "all", Value: ""}}
-	for _, s := range cfg.SeverityLevels {
-		sevOpts = append(sevOpts, components.Option{Label: s, Value: s})
+	for _, pair := range models.AllSeverityOptions() {
+		sevOpts = append(sevOpts, components.Option{Label: pair[0], Value: pair[1]})
 	}
 
 	// Applications: "all" first, then list from config.
@@ -264,9 +265,15 @@ func (f FilterScreen) updateActiveInput(msg tea.Msg) (FilterScreen, tea.Cmd) {
 }
 
 func (f FilterScreen) triggerSearch() tea.Cmd {
+	severity := models.SeverityAll
+	if v := f.severityDD.Selected().Value; v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			severity = n
+		}
+	}
 	filter := models.Filter{
 		Environment: f.envDD.Selected().Value,
-		Severity:    f.severityDD.Selected().Value,
+		Severity:    severity,
 		Application: f.appDD.Selected().Value,
 		Timeframe:   f.timeframeDD.Selected().Value,
 		TraceID:     strings.TrimSpace(f.traceInput.Value()),
