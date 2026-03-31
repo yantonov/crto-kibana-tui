@@ -39,7 +39,7 @@ func (c *Client) Search(ctx context.Context, kibanaURL, indexPattern string, bod
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("kbn-xsrf", "true")
+	req.Header.Set("osd-xsrf", "true")
 	req.SetBasicAuth(c.username, c.password)
 
 	resp, err := c.httpClient.Do(req)
