@@ -114,8 +114,18 @@ applications:
 timeframes:
   - label: "15 minutes"
     value: "15m"
+  - label: "30 minutes"
+    value: "30m"
   - label: "1 hour"
     value: "1h"
+  - label: "3 hours"
+    value: "3h"
+  - label: "6 hours"
+    value: "6h"
   - label: "24 hours"
     value: "24h"
+  - label: "2 days"
+    value: "2d"
+  - label: "7 days"
+    value: "7d"
 `
