@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/criteo/klt/src/export"
 	"github.com/criteo/klt/src/models"
 )
 
@@ -47,7 +48,8 @@ type DetailScreen struct {
 	kibanaURL string
 
 	vp      viewport.Model
-	rawView bool // false = pretty-printed JSON, true = raw JSON string
+	rawView bool   // false = pretty-printed JSON, true = raw JSON string
+	notice  string // transient feedback shown in the status bar
 
 	width  int
 	height int
@@ -83,6 +85,7 @@ func (ds DetailScreen) Update(msg tea.Msg) (DetailScreen, tea.Cmd) {
 		return ds, nil
 
 	case tea.KeyMsg:
+		ds.notice = "" // clear previous notice on any keypress
 		switch msg.String() {
 		case "esc", "b":
 			return ds, func() tea.Msg { return BackToResultsMsg{} }
@@ -90,8 +93,19 @@ func (ds DetailScreen) Update(msg tea.Msg) (DetailScreen, tea.Cmd) {
 			ds.rawView = !ds.rawView
 			ds.vp.SetContent(ds.bodyContent())
 			return ds, nil
-		case "c", "o":
-			// Phase 8: clipboard copy / Kibana browser open
+		case "c":
+			if err := export.CopyText(ds.entry.RawJSON); err != nil {
+				ds.notice = "copy failed: " + err.Error()
+			} else {
+				ds.notice = "copied to clipboard"
+			}
+			return ds, nil
+		case "o":
+			if err := export.OpenURL(ds.kibanaURL); err != nil {
+				ds.notice = "failed to open browser: " + err.Error()
+			} else {
+				ds.notice = "opening Kibana…"
+			}
 			return ds, nil
 		}
 	}
@@ -163,6 +177,9 @@ func (ds DetailScreen) bodyContent() string {
 }
 
 func (ds DetailScreen) statusBar() string {
+	if ds.notice != "" {
+		return detailStatusBar.Width(ds.width).Render(ds.notice)
+	}
 	toggle := "r raw"
 	if ds.rawView {
 		toggle = "r formatted"

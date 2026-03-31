@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/criteo/klt/src/export"
 	"github.com/criteo/klt/src/models"
 )
 
@@ -46,6 +47,7 @@ type ResultsScreen struct {
 	filterInput textinput.Model
 	filtering   bool
 	filtered    []models.LogEntry // currently visible subset (nil = show all)
+	notice      string            // transient feedback shown in the status bar
 
 	width  int
 	height int
@@ -123,6 +125,8 @@ func (rs ResultsScreen) View() string {
 // ── key handling ─────────────────────────────────────────────────────────────
 
 func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
+	rs.notice = "" // clear previous notice on any keypress
+
 	switch msg.String() {
 	case "r":
 		return rs, func() tea.Msg { return BackToFilterMsg{} }
@@ -134,6 +138,28 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 			entry := entries[cur]
 			return rs, func() tea.Msg { return OpenDetailMsg{Entry: entry} }
 		}
+
+	case "e":
+		entries := rs.visibleEntries()
+		path, err := export.WriteNDJSON(entries)
+		if err != nil {
+			rs.notice = "export failed: " + err.Error()
+		} else {
+			rs.notice = fmt.Sprintf("exported %d results → %s", len(entries), path)
+		}
+		return rs, nil
+
+	case "c":
+		entries := rs.visibleEntries()
+		cur := rs.tbl.Cursor()
+		if cur >= 0 && cur < len(entries) {
+			if err := export.CopyText(entries[cur].RawJSON); err != nil {
+				rs.notice = "copy failed: " + err.Error()
+			} else {
+				rs.notice = "copied to clipboard"
+			}
+		}
+		return rs, nil
 
 	case "/":
 		rs.filtering = true
@@ -251,8 +277,6 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 }
 
 func (rs ResultsScreen) statusBar() string {
-	entries := rs.visibleEntries()
-
 	var dcParts []string
 	for _, dc := range rs.allDCs {
 		if _, hasErr := rs.result.DCErrors[dc]; hasErr {
@@ -263,17 +287,23 @@ func (rs ResultsScreen) statusBar() string {
 	}
 	dcSection := strings.Join(dcParts, " ")
 
+	entries := rs.visibleEntries()
 	count := fmt.Sprintf("%d results", len(entries))
 	if rs.filtered != nil {
 		count = fmt.Sprintf("%d / %d results", len(entries), len(rs.result.Entries))
 	}
 
-	keys := "↑↓/jk navigate · enter detail · r refine · / filter · e export · c copy"
+	var right string
+	if rs.notice != "" {
+		right = rs.notice
+	} else {
+		right = "↑↓/jk navigate · enter detail · r refine · / filter · e export · c copy"
+	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Left,
 		dcSection+"  ",
 		count+"    ",
-		keys,
+		right,
 	)
 	return resultsStatusBar.Width(rs.width).Render(content)
 }
