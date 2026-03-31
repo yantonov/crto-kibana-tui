@@ -167,12 +167,7 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 		return rs, textinput.Blink
 
 	case "esc":
-		if rs.filtered != nil {
-			rs.filtered = nil
-			rs.filterInput.SetValue("")
-			rs.tbl = rs.buildTable(rs.visibleEntries())
-		}
-		return rs, nil
+		return rs, func() tea.Msg { return BackToFilterMsg{} }
 	}
 
 	var cmd tea.Cmd
@@ -297,7 +292,7 @@ func (rs ResultsScreen) statusBar() string {
 	if rs.notice != "" {
 		right = rs.notice
 	} else {
-		right = "↑↓/jk navigate · enter detail · r refine · / filter · e export · c copy"
+		right = "↑↓/jk navigate · enter detail · / filter · esc back · e export · c copy"
 	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Left,

@@ -82,6 +82,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.showHelp = false
 				return a, nil
 			}
+			if a.active == screenFilter {
+				return a, tea.Quit
+			}
 		}
 		if a.showHelp {
 			// All other keys close the help overlay.
@@ -196,12 +199,14 @@ func helpView(width, height int) string {
 		"  tab            next field",
 		"  shift+tab     prev field",
 		"  enter          confirm dropdown",
+		"  esc             quit",
 		"",
 		helpSectionStyle.Render("Results Screen"),
 		"  ↑/↓  j/k       navigate rows",
 		"  enter           open detail",
 		"  r                back to filter",
 		"  /                inline filter",
+		"  esc             back to filter",
 		"  e                export to NDJSON file",
 		"  c                copy selected row JSON",
 		"",
