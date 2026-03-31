@@ -32,6 +32,7 @@ type App struct {
 
 	filterScreen  screens.FilterScreen
 	resultsScreen screens.ResultsScreen
+	detailScreen  screens.DetailScreen
 
 	// populated after a search completes
 	result      models.CombinedResult
@@ -69,6 +70,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			a.resultsScreen, cmd = a.resultsScreen.Update(msg)
 			return a, cmd
+		case screenDetail:
+			var cmd tea.Cmd
+			a.detailScreen, cmd = a.detailScreen.Update(msg)
+			return a, cmd
 		}
 		return a, nil
 
@@ -95,9 +100,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenFilter
 		return a, nil
 
-	// User selected a log entry — Phase 7.
+	// User selected a log entry.
 	case screens.OpenDetailMsg:
+		kibanaBase := a.cfg.KibanaURL(msg.Entry.DataCenter, msg.Entry.Environment)
+		a.detailScreen = screens.NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
 		a.active = screenDetail
+		return a, nil
+
+	// User navigates back from detail to results.
+	case screens.BackToResultsMsg:
+		a.active = screenResults
 		return a, nil
 	}
 
@@ -110,6 +122,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenResults:
 		var cmd tea.Cmd
 		a.resultsScreen, cmd = a.resultsScreen.Update(msg)
+		return a, cmd
+	case screenDetail:
+		var cmd tea.Cmd
+		a.detailScreen, cmd = a.detailScreen.Update(msg)
 		return a, cmd
 	}
 
@@ -124,7 +140,7 @@ func (a App) View() string {
 	case screenResults:
 		return a.resultsScreen.View()
 	case screenDetail:
-		return "[detail screen — Phase 7]"
+		return a.detailScreen.View()
 	default:
 		return ""
 	}
