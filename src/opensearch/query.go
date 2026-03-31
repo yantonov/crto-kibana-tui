@@ -4,8 +4,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/criteo/klt/src/config"
 	"github.com/criteo/klt/src/models"
+)
+
+const (
+	fieldTimestamp   = "@timestamp"
+	fieldSeverity    = "level"
+	fieldApplication = "app"
+	fieldTraceID     = "trace_id"
+	fieldMessage     = "message"
 )
 
 // timeframeDSL converts a timeframe string (e.g. "1h", "2d") to an OpenSearch range gte value.
@@ -19,11 +26,11 @@ func timeframeDSL(tf string) string {
 }
 
 // BuildQuery constructs an OpenSearch DSL query body from the given filter.
-func BuildQuery(f models.Filter, fm config.FieldMapping, size int) map[string]interface{} {
+func BuildQuery(f models.Filter, size int) map[string]interface{} {
 	filters := []interface{}{
 		map[string]interface{}{
 			"range": map[string]interface{}{
-				fm.Timestamp: map[string]interface{}{
+				fieldTimestamp: map[string]interface{}{
 					"gte": timeframeDSL(f.Timeframe),
 					"lte": "now",
 				},
@@ -33,17 +40,17 @@ func BuildQuery(f models.Filter, fm config.FieldMapping, size int) map[string]in
 
 	if f.Severity != "" {
 		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fm.Severity: f.Severity},
+			"term": map[string]interface{}{fieldSeverity: f.Severity},
 		})
 	}
 	if f.Application != "" {
 		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fm.Application: f.Application},
+			"term": map[string]interface{}{fieldApplication: f.Application},
 		})
 	}
 	if f.TraceID != "" {
 		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fm.TraceID: f.TraceID},
+			"term": map[string]interface{}{fieldTraceID: f.TraceID},
 		})
 	}
 
@@ -56,7 +63,7 @@ func BuildQuery(f models.Filter, fm config.FieldMapping, size int) map[string]in
 			map[string]interface{}{
 				"query_string": map[string]interface{}{
 					"query":         q,
-					"default_field": fm.Message,
+					"default_field": fieldMessage,
 				},
 			},
 		}
@@ -66,7 +73,7 @@ func BuildQuery(f models.Filter, fm config.FieldMapping, size int) map[string]in
 		"size": size,
 		"sort": []interface{}{
 			map[string]interface{}{
-				fm.Timestamp: map[string]interface{}{"order": "desc"},
+				fieldTimestamp: map[string]interface{}{"order": "desc"},
 			},
 		},
 		"query": map[string]interface{}{

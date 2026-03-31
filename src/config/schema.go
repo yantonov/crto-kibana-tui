@@ -7,7 +7,6 @@ type Config struct {
 	Applications          []string                     `yaml:"applications"`
 	SeverityLevels        []string                     `yaml:"severity_levels"`
 	Timeframes            []TimeframeOption            `yaml:"timeframes"`
-	FieldMapping          FieldMapping                 `yaml:"field_mapping"`
 }
 
 type EnvironmentConfig struct {
@@ -17,12 +16,4 @@ type EnvironmentConfig struct {
 type TimeframeOption struct {
 	Label string `yaml:"label"`
 	Value string `yaml:"value"`
-}
-
-type FieldMapping struct {
-	Timestamp   string `yaml:"timestamp"`
-	Severity    string `yaml:"severity"`
-	Application string `yaml:"application"`
-	TraceID     string `yaml:"trace_id"`
-	Message     string `yaml:"message"`
 }

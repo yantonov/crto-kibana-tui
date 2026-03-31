@@ -76,37 +76,34 @@ func SearchAll(ctx context.Context, filter models.Filter, cfg *config.Config, cl
 // searchOne performs a single _search against one data center and maps hits to LogEntry.
 func searchOne(ctx context.Context, dc string, filter models.Filter, cfg *config.Config, client *Client) ([]models.LogEntry, int, error) {
 	baseURL := cfg.KibanaURL(dc, filter.Environment)
-	query := BuildQuery(filter, cfg.FieldMapping, defaultPageSize)
+	query := BuildQuery(filter, defaultPageSize)
 
 	resp, err := client.Search(ctx, baseURL, cfg.IndexPattern, query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search %s: %w", dc, err)
 	}
 
-	fm := cfg.FieldMapping
 	entries := make([]models.LogEntry, 0, len(resp.Hits.Hits))
 	for _, hit := range resp.Hits.Hits {
-		entry := mapHit(hit, fm, dc, filter.Environment)
+		entry := mapHit(hit, dc, filter.Environment)
 		entries = append(entries, entry)
 	}
 
 	return entries, resp.Hits.Total.Value, nil
 }
 
-// mapHit converts a raw OpenSearch hit into a LogEntry using the configured field mapping.
-func mapHit(hit Hit, fm config.FieldMapping, dc, env string) models.LogEntry {
+// mapHit converts a raw OpenSearch hit into a LogEntry.
+func mapHit(hit Hit, dc, env string) models.LogEntry {
 	src := hit.Source
 
 	raw, _ := json.Marshal(src)
 
-	ts := parseTimestamp(stringField(src, fm.Timestamp))
-
 	return models.LogEntry{
-		Timestamp:   ts,
-		Severity:    stringField(src, fm.Severity),
-		Application: stringField(src, fm.Application),
-		TraceID:     stringField(src, fm.TraceID),
-		Message:     stringField(src, fm.Message),
+		Timestamp:   parseTimestamp(stringField(src, fieldTimestamp)),
+		Severity:    stringField(src, fieldSeverity),
+		Application: stringField(src, fieldApplication),
+		TraceID:     stringField(src, fieldTraceID),
+		Message:     stringField(src, fieldMessage),
 		DataCenter:  dc,
 		Environment: env,
 		RawJSON:     string(raw),

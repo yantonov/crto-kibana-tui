@@ -53,9 +53,6 @@ func validate(cfg *Config) error {
 	if cfg.IndexPattern == "" {
 		return fmt.Errorf("index_pattern is required")
 	}
-	if cfg.FieldMapping.Timestamp == "" {
-		return fmt.Errorf("field_mapping.timestamp is required")
-	}
 	if cfg.QueryTimeoutSeconds <= 0 {
 		cfg.QueryTimeoutSeconds = 10
 	}
@@ -96,11 +93,17 @@ func replaceAll(s, old, new string) string {
 const configTemplate = `environments:
   prod:
     data_centers:
-      - dc1
-      - dc2
-  staging:
+      - da1
+      - us5
+      - fr3
+      - fr4
+      - nl3
+      - jp2
+      - sg1
+  preprod:
     data_centers:
-      - dc1
+      - da1
+      - fr4
 
 index_pattern: "logs-*"
 query_timeout_seconds: 10
@@ -121,11 +124,4 @@ timeframes:
     value: "1h"
   - label: "24 hours"
     value: "24h"
-
-field_mapping:
-  timestamp: "@timestamp"
-  severity: "level"
-  application: "app"
-  trace_id: "trace_id"
-  message: "message"
 `
