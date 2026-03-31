@@ -51,7 +51,7 @@ func validate(cfg *Config) error {
 		return fmt.Errorf("no environments defined")
 	}
 	if cfg.IndexPattern == "" {
-		return fmt.Errorf("index_pattern is required")
+		cfg.IndexPattern = "kestrel-*"
 	}
 	if cfg.QueryTimeoutSeconds <= 0 {
 		cfg.QueryTimeoutSeconds = 10
@@ -105,7 +105,7 @@ const configTemplate = `environments:
       - da1
       - fr4
 
-index_pattern: "logs-*"
+index_pattern: "kestrel-*"
 query_timeout_seconds: 10
 
 applications:
