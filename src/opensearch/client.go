@@ -25,6 +25,27 @@ func NewClient(username, password string) *Client {
 	}
 }
 
+// Ping makes a lightweight GET /api/status request to verify that the Kibana
+// endpoint is reachable and the credentials are accepted.
+func (c *Client) Ping(ctx context.Context, kibanaURL string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, kibanaURL+"/api/status", nil)
+	if err != nil {
+		return fmt.Errorf("build ping request: %w", err)
+	}
+	req.SetBasicAuth(c.username, c.password)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("ping: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return fmt.Errorf("invalid credentials (HTTP 401)")
+	}
+	return nil
+}
+
 // Search executes a _search request via the Kibana console proxy.
 // body must be a JSON-serialisable map (as returned by BuildQuery).
 func (c *Client) Search(ctx context.Context, kibanaURL, indexPattern string, body map[string]interface{}) (*SearchResponse, error) {

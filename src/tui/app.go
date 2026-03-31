@@ -2,8 +2,10 @@ package tui
 
 import (
 	"context"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/criteo/klt/src/config"
 	"github.com/criteo/klt/src/models"
@@ -26,9 +28,10 @@ type App struct {
 	cfg    *config.Config
 	client *opensearch.Client
 
-	active screen
-	width  int
-	height int
+	active   screen
+	showHelp bool
+	width    int
+	height   int
 
 	filterScreen  screens.FilterScreen
 	resultsScreen screens.ResultsScreen
@@ -61,25 +64,29 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		switch a.active {
-		case screenFilter:
-			var cmd tea.Cmd
-			a.filterScreen, cmd = a.filterScreen.Update(msg)
-			return a, cmd
-		case screenResults:
-			var cmd tea.Cmd
-			a.resultsScreen, cmd = a.resultsScreen.Update(msg)
-			return a, cmd
-		case screenDetail:
-			var cmd tea.Cmd
-			a.detailScreen, cmd = a.detailScreen.Update(msg)
-			return a, cmd
-		}
+		// Update every screen so dimensions are correct on any transition.
+		a.filterScreen, _ = a.filterScreen.Update(msg)
+		a.resultsScreen, _ = a.resultsScreen.Update(msg)
+		a.detailScreen, _ = a.detailScreen.Update(msg)
 		return a, nil
 
 	case tea.KeyMsg:
-		if msg.String() == "ctrl+c" {
+		switch msg.String() {
+		case "ctrl+c":
 			return a, tea.Quit
+		case "?":
+			a.showHelp = !a.showHelp
+			return a, nil
+		case "esc":
+			if a.showHelp {
+				a.showHelp = false
+				return a, nil
+			}
+		}
+		if a.showHelp {
+			// All other keys close the help overlay.
+			a.showHelp = false
+			return a, nil
 		}
 
 	// Search was triggered from FilterScreen.
@@ -113,6 +120,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 	}
 
+	if a.showHelp {
+		return a, nil
+	}
+
 	// Delegate to the active screen.
 	switch a.active {
 	case screenFilter:
@@ -132,8 +143,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return a, nil
 }
 
-// View renders the active screen.
+// View renders the active screen or the help overlay.
 func (a App) View() string {
+	if a.showHelp {
+		return helpView(a.width, a.height)
+	}
 	switch a.active {
 	case screenFilter:
 		return a.filterScreen.View()
@@ -154,4 +168,54 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 		result := opensearch.SearchAll(context.Background(), filter, cfg, client)
 		return SearchDoneMsg{Result: result}
 	}
+}
+
+// ── help overlay ──────────────────────────────────────────────────────────────
+
+var (
+	helpTitleStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("#7C3AED"))
+
+	helpSectionStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("#D1D5DB"))
+
+	helpBoxStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#7C3AED")).
+			Padding(1, 3)
+)
+
+func helpView(width, height int) string {
+	lines := []string{
+		helpTitleStyle.Render("klt — Key Bindings"),
+		"",
+		helpSectionStyle.Render("Filter Screen"),
+		"  ctrl+s        search",
+		"  tab            next field",
+		"  shift+tab     prev field",
+		"  enter          confirm dropdown",
+		"",
+		helpSectionStyle.Render("Results Screen"),
+		"  ↑/↓  j/k       navigate rows",
+		"  enter           open detail",
+		"  r                back to filter",
+		"  /                inline filter",
+		"  e                export to NDJSON file",
+		"  c                copy selected row JSON",
+		"",
+		helpSectionStyle.Render("Detail Screen"),
+		"  ↑/↓  j/k       scroll",
+		"  r                toggle raw / formatted",
+		"  c                copy entry JSON",
+		"  o                open in Kibana",
+		"  esc / b          back to results",
+		"",
+		helpSectionStyle.Render("Global"),
+		"  ?                toggle this help",
+		"  ctrl+c           quit",
+	}
+	box := helpBoxStyle.Render(strings.Join(lines, "\n"))
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)
 }
