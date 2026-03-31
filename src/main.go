@@ -1,15 +1,14 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/models"
 	"github.com/criteo/klt/src/opensearch"
+	"github.com/criteo/klt/src/tui"
 )
 
 func main() {
@@ -38,27 +37,10 @@ func main() {
 		log.Fatal("OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD must be set")
 	}
 
-	filter := models.Filter{
-		Environment: "prod",
-		Timeframe:   "15m",
-		Severity:    "ERROR",
-	}
-
 	client := opensearch.NewClient(username, password)
 
-	result := opensearch.SearchAll(context.Background(), filter, cfg, client)
-
-	if len(result.DCErrors) > 0 {
-		for dc, dcErr := range result.DCErrors {
-			fmt.Fprintf(os.Stderr, "DC %s error: %v\n", dc, dcErr)
-		}
-	}
-
-	fmt.Fprintf(os.Stderr, "total hits: %d, returned: %d\n", result.TotalHits, len(result.Entries))
-
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(result.Entries); err != nil {
-		log.Fatalf("encode: %v", err)
+	p := tea.NewProgram(tui.New(cfg, client), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		log.Fatalf("tui: %v", err)
 	}
 }
