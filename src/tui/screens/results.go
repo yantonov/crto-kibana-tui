@@ -1,0 +1,290 @@
+package screens
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/criteo/klt/src/models"
+)
+
+// BackToFilterMsg is sent when the user wants to refine the search.
+type BackToFilterMsg struct{}
+
+// OpenDetailMsg is sent when the user selects a log entry.
+type OpenDetailMsg struct {
+	Entry models.LogEntry
+}
+
+var (
+	resultsStatusBar = lipgloss.NewStyle().
+				Background(lipgloss.Color("#1F2937")).
+				Foreground(lipgloss.Color("#F9FAFB")).
+				Padding(0, 1)
+
+	resultsDCOK  = lipgloss.NewStyle().Foreground(lipgloss.Color("#10B981"))
+	resultsDCErr = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF4444"))
+
+	resultsFilterInput = lipgloss.NewStyle().
+				BorderStyle(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("#7C3AED")).
+				PaddingLeft(1).PaddingRight(1)
+)
+
+// ResultsScreen displays the merged search results in a table.
+type ResultsScreen struct {
+	result  models.CombinedResult
+	allDCs  []string // sorted list of all DCs that were searched
+	ready   bool     // true after NewResultsScreen has been called
+
+	tbl         table.Model
+	filterInput textinput.Model
+	filtering   bool
+	filtered    []models.LogEntry // currently visible subset (nil = show all)
+
+	width  int
+	height int
+}
+
+// NewResultsScreen constructs a ResultsScreen from the combined search result.
+func NewResultsScreen(result models.CombinedResult, width, height int) ResultsScreen {
+	dcSet := make(map[string]struct{})
+	for _, e := range result.Entries {
+		dcSet[e.DataCenter] = struct{}{}
+	}
+	for dc := range result.DCErrors {
+		dcSet[dc] = struct{}{}
+	}
+	allDCs := make([]string, 0, len(dcSet))
+	for dc := range dcSet {
+		allDCs = append(allDCs, dc)
+	}
+	sort.Strings(allDCs)
+
+	fi := textinput.New()
+	fi.Placeholder = "filter..."
+	fi.CharLimit = 128
+
+	rs := ResultsScreen{
+		result:      result,
+		allDCs:      allDCs,
+		filterInput: fi,
+		width:       width,
+		height:      height,
+		ready:       true,
+	}
+	rs.tbl = rs.buildTable(result.Entries)
+	return rs
+}
+
+// Init satisfies the screen interface.
+func (rs ResultsScreen) Init() tea.Cmd { return nil }
+
+// Update handles all messages for the results screen.
+func (rs ResultsScreen) Update(msg tea.Msg) (ResultsScreen, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		rs.width = msg.Width
+		rs.height = msg.Height
+		rs.tbl = rs.buildTable(rs.visibleEntries())
+		return rs, nil
+
+	case tea.KeyMsg:
+		if rs.filtering {
+			return rs.handleFilterKey(msg)
+		}
+		return rs.handleKey(msg)
+	}
+	return rs, nil
+}
+
+// View renders the results table and status bar.
+func (rs ResultsScreen) View() string {
+	if !rs.ready {
+		return "  Searching…"
+	}
+
+	var parts []string
+
+	if rs.filtering {
+		parts = append(parts, "  / "+resultsFilterInput.Render(rs.filterInput.View()))
+	}
+	parts = append(parts, rs.tbl.View())
+	parts = append(parts, rs.statusBar())
+
+	return strings.Join(parts, "\n")
+}
+
+// ── key handling ─────────────────────────────────────────────────────────────
+
+func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
+	switch msg.String() {
+	case "r":
+		return rs, func() tea.Msg { return BackToFilterMsg{} }
+
+	case "enter":
+		entries := rs.visibleEntries()
+		cur := rs.tbl.Cursor()
+		if cur >= 0 && cur < len(entries) {
+			entry := entries[cur]
+			return rs, func() tea.Msg { return OpenDetailMsg{Entry: entry} }
+		}
+
+	case "/":
+		rs.filtering = true
+		rs.filterInput.Focus()
+		return rs, textinput.Blink
+
+	case "esc":
+		if rs.filtered != nil {
+			rs.filtered = nil
+			rs.filterInput.SetValue("")
+			rs.tbl = rs.buildTable(rs.visibleEntries())
+		}
+		return rs, nil
+	}
+
+	var cmd tea.Cmd
+	rs.tbl, cmd = rs.tbl.Update(msg)
+	return rs, cmd
+}
+
+func (rs ResultsScreen) handleFilterKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
+	switch msg.String() {
+	case "enter", "esc":
+		rs.filtering = false
+		rs.filterInput.Blur()
+		return rs, nil
+	}
+
+	var cmd tea.Cmd
+	rs.filterInput, cmd = rs.filterInput.Update(msg)
+
+	query := strings.ToLower(rs.filterInput.Value())
+	if query == "" {
+		rs.filtered = nil
+	} else {
+		rs.filtered = nil
+		for _, e := range rs.result.Entries {
+			if strings.Contains(strings.ToLower(e.Message), query) ||
+				strings.Contains(strings.ToLower(e.Application), query) ||
+				strings.Contains(strings.ToLower(e.TraceID), query) {
+				rs.filtered = append(rs.filtered, e)
+			}
+		}
+	}
+	rs.tbl = rs.buildTable(rs.visibleEntries())
+	return rs, cmd
+}
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+func (rs ResultsScreen) visibleEntries() []models.LogEntry {
+	if rs.filtered != nil {
+		return rs.filtered
+	}
+	return rs.result.Entries
+}
+
+func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
+	// Leave room for status bar (1) and optional filter input (1), plus table header.
+	tableHeight := rs.height - 3
+	if tableHeight < 3 {
+		tableHeight = 3
+	}
+
+	const (
+		tsWidth  = 20
+		sevWidth = 8
+		dcWidth  = 8
+		appWidth = 20
+		gaps     = 10
+	)
+	msgWidth := rs.width - tsWidth - sevWidth - dcWidth - appWidth - gaps
+	if msgWidth < 20 {
+		msgWidth = 20
+	}
+
+	cols := []table.Column{
+		{Title: "Timestamp", Width: tsWidth},
+		{Title: "Severity", Width: sevWidth},
+		{Title: "DC", Width: dcWidth},
+		{Title: "Application", Width: appWidth},
+		{Title: "Message", Width: msgWidth},
+	}
+
+	rows := make([]table.Row, len(entries))
+	for i, e := range entries {
+		rows[i] = table.Row{
+			e.Timestamp.Format("2006-01-02 15:04:05"),
+			e.Severity,
+			e.DataCenter,
+			e.Application,
+			truncate(e.Message, msgWidth),
+		}
+	}
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("#6B7280")).
+		BorderBottom(true).
+		Bold(true)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("#FFFFFF")).
+		Background(lipgloss.Color("#7C3AED")).
+		Bold(true)
+
+	t := table.New(
+		table.WithColumns(cols),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		table.WithHeight(tableHeight),
+		table.WithStyles(s),
+	)
+	return t
+}
+
+func (rs ResultsScreen) statusBar() string {
+	entries := rs.visibleEntries()
+
+	var dcParts []string
+	for _, dc := range rs.allDCs {
+		if _, hasErr := rs.result.DCErrors[dc]; hasErr {
+			dcParts = append(dcParts, resultsDCErr.Render("● "+dc))
+		} else {
+			dcParts = append(dcParts, resultsDCOK.Render("● "+dc))
+		}
+	}
+	dcSection := strings.Join(dcParts, " ")
+
+	count := fmt.Sprintf("%d results", len(entries))
+	if rs.filtered != nil {
+		count = fmt.Sprintf("%d / %d results", len(entries), len(rs.result.Entries))
+	}
+
+	keys := "↑↓/jk navigate · enter detail · r refine · / filter · e export · c copy"
+
+	content := lipgloss.JoinHorizontal(lipgloss.Left,
+		dcSection+"  ",
+		count+"    ",
+		keys,
+	)
+	return resultsStatusBar.Width(rs.width).Render(content)
+}
+
+func truncate(s string, n int) string {
+	runes := []rune(s)
+	if len(runes) <= n {
+		return s
+	}
+	if n <= 3 {
+		return string(runes[:n])
+	}
+	return string(runes[:n-3]) + "..."
+}

@@ -30,7 +30,8 @@ type App struct {
 	width  int
 	height int
 
-	filterScreen screens.FilterScreen
+	filterScreen  screens.FilterScreen
+	resultsScreen screens.ResultsScreen
 
 	// populated after a search completes
 	result      models.CombinedResult
@@ -59,11 +60,14 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		// Forward to active screen.
 		switch a.active {
 		case screenFilter:
 			var cmd tea.Cmd
 			a.filterScreen, cmd = a.filterScreen.Update(msg)
+			return a, cmd
+		case screenResults:
+			var cmd tea.Cmd
+			a.resultsScreen, cmd = a.resultsScreen.Update(msg)
 			return a, cmd
 		}
 		return a, nil
@@ -82,7 +86,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SearchDoneMsg:
 		a.result = msg.Result
 		a.selectedIdx = 0
+		a.resultsScreen = screens.NewResultsScreen(msg.Result, a.width, a.height)
 		a.active = screenResults
+		return a, nil
+
+	// User wants to refine the search.
+	case screens.BackToFilterMsg:
+		a.active = screenFilter
+		return a, nil
+
+	// User selected a log entry — Phase 7.
+	case screens.OpenDetailMsg:
+		a.active = screenDetail
 		return a, nil
 	}
 
@@ -91,6 +106,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case screenFilter:
 		var cmd tea.Cmd
 		a.filterScreen, cmd = a.filterScreen.Update(msg)
+		return a, cmd
+	case screenResults:
+		var cmd tea.Cmd
+		a.resultsScreen, cmd = a.resultsScreen.Update(msg)
 		return a, cmd
 	}
 
@@ -103,7 +122,7 @@ func (a App) View() string {
 	case screenFilter:
 		return a.filterScreen.View()
 	case screenResults:
-		return "[results screen — Phase 6]"
+		return a.resultsScreen.View()
 	case screenDetail:
 		return "[detail screen — Phase 7]"
 	default:
