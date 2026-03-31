@@ -9,8 +9,8 @@ import (
 
 const (
 	fieldTimestamp   = "@timestamp"
-	fieldSeverity    = "level"
-	fieldApplication = "app"
+	fieldSeverity    = "severity"
+	fieldApplication = "application"
 	fieldTraceID     = "trace_id"
 	fieldMessage     = "message"
 )
