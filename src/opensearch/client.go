@@ -25,20 +25,21 @@ func NewClient(username, password string) *Client {
 	}
 }
 
-// Search executes a _search request against the given base URL and index pattern.
+// Search executes a _search request via the Kibana console proxy.
 // body must be a JSON-serialisable map (as returned by BuildQuery).
-func (c *Client) Search(ctx context.Context, baseURL, indexPattern string, body map[string]interface{}) (*SearchResponse, error) {
+func (c *Client) Search(ctx context.Context, kibanaURL, indexPattern string, body map[string]interface{}) (*SearchResponse, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal query: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/%s/_search", baseURL, indexPattern)
+	url := fmt.Sprintf("%s/api/console/proxy?path=%s%%2F_search&method=POST", kibanaURL, indexPattern)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("kbn-xsrf", "true")
 	req.SetBasicAuth(c.username, c.password)
 
 	resp, err := c.httpClient.Do(req)

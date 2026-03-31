@@ -1,10 +1,8 @@
 package config
 
 type Config struct {
-	Environments          map[string]EnvironmentConfig `yaml:"environments"`
-	KibanaURLTemplate     string                       `yaml:"kibana_url_template"`
-	OpenSearchURLTemplate string                       `yaml:"opensearch_url_template"`
-	IndexPattern          string                       `yaml:"index_pattern"`
+	Environments map[string]EnvironmentConfig `yaml:"environments"`
+	IndexPattern string                       `yaml:"index_pattern"`
 	QueryTimeoutSeconds   int                          `yaml:"query_timeout_seconds"`
 	Applications          []string                     `yaml:"applications"`
 	SeverityLevels        []string                     `yaml:"severity_levels"`

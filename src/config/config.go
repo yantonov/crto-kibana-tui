@@ -50,9 +50,6 @@ func validate(cfg *Config) error {
 	if len(cfg.Environments) == 0 {
 		return fmt.Errorf("no environments defined")
 	}
-	if cfg.OpenSearchURLTemplate == "" {
-		return fmt.Errorf("opensearch_url_template is required")
-	}
 	if cfg.IndexPattern == "" {
 		return fmt.Errorf("index_pattern is required")
 	}
@@ -74,17 +71,9 @@ func (c *Config) DataCenters(env string) ([]string, error) {
 	return e.DataCenters, nil
 }
 
-// OpenSearchURL builds the OpenSearch base URL for a given dc/env pair.
-func (c *Config) OpenSearchURL(dc, env string) string {
-	url := c.OpenSearchURLTemplate
-	url = replaceAll(url, "{dc}", dc)
-	url = replaceAll(url, "{env}", env)
-	return url
-}
-
 // KibanaURL builds the Kibana base URL for a given dc/env pair.
 func (c *Config) KibanaURL(dc, env string) string {
-	url := c.KibanaURLTemplate
+	url := "https://kibana.{dc}.{env}.crto.in"
 	url = replaceAll(url, "{dc}", dc)
 	url = replaceAll(url, "{env}", env)
 	return url
@@ -113,8 +102,6 @@ const configTemplate = `environments:
     data_centers:
       - dc1
 
-opensearch_url_template: "https://opensearch.{dc}.{env}.example.com"
-kibana_url_template: "https://kibana.{dc}.{env}.example.com"
 index_pattern: "logs-*"
 query_timeout_seconds: 10
 
