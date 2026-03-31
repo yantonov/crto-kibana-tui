@@ -1,0 +1,37 @@
+environments:
+  prod:
+    data_centers:
+      - dc1
+      - dc2
+  staging:
+    data_centers:
+      - dc1
+
+opensearch_url_template: "https://opensearch.{dc}.{env}.example.com"
+kibana_url_template: "https://kibana.{dc}.{env}.example.com"
+index_pattern: "logs-*"
+query_timeout_seconds: 10
+
+applications:
+  - my-app
+
+severity_levels:
+  - ERROR
+  - WARN
+  - INFO
+  - DEBUG
+
+timeframes:
+  - label: "15 minutes"
+    value: "15m"
+  - label: "1 hour"
+    value: "1h"
+  - label: "24 hours"
+    value: "24h"
+
+field_mapping:
+  timestamp: "@timestamp"
+  severity: "level"
+  application: "app"
+  trace_id: "trace_id"
+  message: "message"

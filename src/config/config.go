@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultConfigPath = "klt.yaml"
+const DefaultConfigPath = "config.yaml"
 
 func Load(path string) (*Config, error) {
 	f, err := os.Open(path)

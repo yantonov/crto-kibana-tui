@@ -1,0 +1,76 @@
+package opensearch
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/criteo/klt/src/config"
+	"github.com/criteo/klt/src/models"
+)
+
+// timeframeDSL converts a timeframe string (e.g. "1h", "2d") to an OpenSearch range gte value.
+func timeframeDSL(tf string) string {
+	switch tf {
+	case "2d", "7d":
+		return fmt.Sprintf("now-%s/d", tf)
+	default:
+		return fmt.Sprintf("now-%s", tf)
+	}
+}
+
+// BuildQuery constructs an OpenSearch DSL query body from the given filter.
+func BuildQuery(f models.Filter, fm config.FieldMapping, size int) map[string]interface{} {
+	filters := []interface{}{
+		map[string]interface{}{
+			"range": map[string]interface{}{
+				fm.Timestamp: map[string]interface{}{
+					"gte": timeframeDSL(f.Timeframe),
+					"lte": "now",
+				},
+			},
+		},
+	}
+
+	if f.Severity != "" {
+		filters = append(filters, map[string]interface{}{
+			"term": map[string]interface{}{fm.Severity: f.Severity},
+		})
+	}
+	if f.Application != "" {
+		filters = append(filters, map[string]interface{}{
+			"term": map[string]interface{}{fm.Application: f.Application},
+		})
+	}
+	if f.TraceID != "" {
+		filters = append(filters, map[string]interface{}{
+			"term": map[string]interface{}{fm.TraceID: f.TraceID},
+		})
+	}
+
+	boolQuery := map[string]interface{}{
+		"filter": filters,
+	}
+
+	if q := strings.TrimSpace(f.Query); q != "" {
+		boolQuery["must"] = []interface{}{
+			map[string]interface{}{
+				"query_string": map[string]interface{}{
+					"query":         q,
+					"default_field": fm.Message,
+				},
+			},
+		}
+	}
+
+	return map[string]interface{}{
+		"size": size,
+		"sort": []interface{}{
+			map[string]interface{}{
+				fm.Timestamp: map[string]interface{}{"order": "desc"},
+			},
+		},
+		"query": map[string]interface{}{
+			"bool": boolQuery,
+		},
+	}
+}
