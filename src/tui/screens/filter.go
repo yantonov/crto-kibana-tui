@@ -77,8 +77,8 @@ type FilterScreen struct {
 // NewFilterScreen constructs a FilterScreen populated from cfg.
 func NewFilterScreen(cfg *config.Config) FilterScreen {
 	// Environments (sorted for determinism).
-	envKeys := make([]string, 0, len(cfg.Environments))
-	for k := range cfg.Environments {
+	envKeys := make([]string, 0, len(config.Environments))
+	for k := range config.Environments {
 		envKeys = append(envKeys, k)
 	}
 	sort.Strings(envKeys)
@@ -99,9 +99,9 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 		appOpts = append(appOpts, components.Option{Label: a, Value: a})
 	}
 
-	// Timeframes: as-is from config.
-	tfOpts := make([]components.Option, len(cfg.Timeframes))
-	for i, tf := range cfg.Timeframes {
+	// Timeframes: as-is from defaults.
+	tfOpts := make([]components.Option, len(config.Timeframes))
+	for i, tf := range config.Timeframes {
 		tfOpts[i] = components.Option{Label: tf.Label, Value: tf.Value}
 	}
 
@@ -115,12 +115,18 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 	queryIn.CharLimit = 512
 	queryIn.Width = inputWidth
 
+	severityDD := components.New(sevOpts)
+	severityDD.SetByValue("3") // Error by default
+
+	timeframeDD := components.New(tfOpts)
+	timeframeDD.SetByValue("3h")
+
 	fs := FilterScreen{
 		cfg:         cfg,
 		envDD:       components.New(envOpts),
-		severityDD:  components.New(sevOpts),
+		severityDD:  severityDD,
 		appDD:       components.New(appOpts),
-		timeframeDD: components.New(tfOpts),
+		timeframeDD: timeframeDD,
 		traceInput:  traceIn,
 		queryInput:  queryIn,
 	}

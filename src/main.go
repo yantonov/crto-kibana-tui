@@ -107,7 +107,7 @@ func runDiag(cfg *config.Config, client *opensearch.Client, env, app, timeframe 
 	fmt.Printf("=== Query (env=%s app=%q timeframe=%s) ===\n%s\n\n", env, app, timeframe, queryJSON)
 
 	// Ping + search each DC.
-	timeout := time.Duration(cfg.QueryTimeoutSeconds) * time.Second
+	timeout := time.Duration(config.QueryTimeoutSeconds) * time.Second
 	sort.Strings(dcs)
 	for _, dc := range dcs {
 		kibanaURL := cfg.KibanaURL(dc, env)
@@ -123,7 +123,7 @@ func runDiag(cfg *config.Config, client *opensearch.Client, env, app, timeframe 
 		fmt.Printf("  ping OK\n")
 
 		searchCtx, searchCancel := context.WithTimeout(context.Background(), timeout)
-		resp, err := client.Search(searchCtx, kibanaURL, cfg.IndexPattern, query)
+		resp, err := client.Search(searchCtx, kibanaURL, config.IndexPattern, query)
 		searchCancel()
 		if err != nil {
 			fmt.Printf("  search FAIL: %v\n", err)
@@ -153,7 +153,7 @@ func sourceKeys(src map[string]interface{}) []string {
 // firstDC returns the first environment name and DC from the config, used for
 // the startup credential ping.
 func firstDC(cfg *config.Config) (env, dc string) {
-	for e, ecfg := range cfg.Environments {
+	for e, ecfg := range config.Environments {
 		if len(ecfg.DataCenters) > 0 {
 			return e, ecfg.DataCenters[0]
 		}

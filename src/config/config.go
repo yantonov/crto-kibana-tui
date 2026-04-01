@@ -10,6 +10,30 @@ import (
 
 const configFileName = "config.yaml"
 
+// IndexPattern is the OpenSearch index pattern to query.
+const IndexPattern = "kestrel-*"
+
+// QueryTimeoutSeconds is the per-datacenter search timeout.
+const QueryTimeoutSeconds = 10
+
+// Environments defines available environments and their data centers.
+var Environments = map[string]EnvironmentConfig{
+	"prod": {DataCenters: []string{"da1", "us5", "fr3", "fr4", "nl3", "jp2", "sg1"}},
+	"preprod": {DataCenters: []string{"da1", "fr4"}},
+}
+
+// Timeframes defines the selectable time range options.
+var Timeframes = []TimeframeOption{
+	{Label: "15 minutes", Value: "15m"},
+	{Label: "30 minutes", Value: "30m"},
+	{Label: "1 hour", Value: "1h"},
+	{Label: "3 hours", Value: "3h"},
+	{Label: "6 hours", Value: "6h"},
+	{Label: "24 hours", Value: "24h"},
+	{Label: "2 days", Value: "2d"},
+	{Label: "7 days", Value: "7d"},
+}
+
 // DefaultConfigPath returns the path to config.yaml next to the executable.
 func DefaultConfigPath() (string, error) {
 	exe, err := os.Executable()
@@ -39,29 +63,12 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 
-	if err := validate(&cfg); err != nil {
-		return nil, fmt.Errorf("invalid config: %w", err)
-	}
-
 	return &cfg, nil
-}
-
-func validate(cfg *Config) error {
-	if len(cfg.Environments) == 0 {
-		return fmt.Errorf("no environments defined")
-	}
-	if cfg.IndexPattern == "" {
-		cfg.IndexPattern = "kestrel-*"
-	}
-	if cfg.QueryTimeoutSeconds <= 0 {
-		cfg.QueryTimeoutSeconds = 10
-	}
-	return nil
 }
 
 // DataCenters returns the list of data centers for the given environment.
 func (c *Config) DataCenters(env string) ([]string, error) {
-	e, ok := c.Environments[env]
+	e, ok := Environments[env]
 	if !ok {
 		return nil, fmt.Errorf("unknown environment %q", env)
 	}
@@ -90,42 +97,6 @@ func replaceAll(s, old, new string) string {
 	return result
 }
 
-const configTemplate = `environments:
-  prod:
-    data_centers:
-      - da1
-      - us5
-      - fr3
-      - fr4
-      - nl3
-      - jp2
-      - sg1
-  preprod:
-    data_centers:
-      - da1
-      - fr4
-
-index_pattern: "kestrel-*"
-query_timeout_seconds: 10
-
-applications:
+const configTemplate = `applications:
   - my-app
-
-timeframes:
-  - label: "15 minutes"
-    value: "15m"
-  - label: "30 minutes"
-    value: "30m"
-  - label: "1 hour"
-    value: "1h"
-  - label: "3 hours"
-    value: "3h"
-  - label: "6 hours"
-    value: "6h"
-  - label: "24 hours"
-    value: "24h"
-  - label: "2 days"
-    value: "2d"
-  - label: "7 days"
-    value: "7d"
 `

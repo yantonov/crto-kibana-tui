@@ -35,7 +35,7 @@ func SearchAll(ctx context.Context, filter models.Filter, cfg *config.Config, cl
 	resultCh := make(chan dcResult, len(dcs))
 
 	g, gctx := errgroup.WithContext(ctx)
-	timeout := time.Duration(cfg.QueryTimeoutSeconds) * time.Second
+	timeout := time.Duration(config.QueryTimeoutSeconds) * time.Second
 
 	for _, dc := range dcs {
 		dc := dc // capture
@@ -78,7 +78,7 @@ func searchOne(ctx context.Context, dc string, filter models.Filter, cfg *config
 	baseURL := cfg.KibanaURL(dc, filter.Environment)
 	query := BuildQuery(filter, defaultPageSize)
 
-	resp, err := client.Search(ctx, baseURL, cfg.IndexPattern, query)
+	resp, err := client.Search(ctx, baseURL, config.IndexPattern, query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search %s: %w", dc, err)
 	}
