@@ -50,13 +50,14 @@ var FilterKeys = FilterKeyMap{
 
 // ResultsKeyMap holds key bindings for the results screen.
 type ResultsKeyMap struct {
-	Up       key.Binding
-	Down     key.Binding
-	Select   key.Binding
-	Export   key.Binding
-	Copy     key.Binding
-	Refine   key.Binding
-	Filter   key.Binding
+	Up      key.Binding
+	Down    key.Binding
+	Select  key.Binding
+	Export  key.Binding
+	Copy    key.Binding
+	Refine  key.Binding
+	Refresh key.Binding
+	Filter  key.Binding
 }
 
 // ResultsKeys is the singleton results key map.
@@ -84,6 +85,10 @@ var ResultsKeys = ResultsKeyMap{
 	Refine: key.NewBinding(
 		key.WithKeys("r"),
 		key.WithHelp("r", "refine search"),
+	),
+	Refresh: key.NewBinding(
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "refresh"),
 	),
 	Filter: key.NewBinding(
 		key.WithKeys("/"),

@@ -17,6 +17,11 @@ import (
 // BackToFilterMsg is sent when the user wants to refine the search.
 type BackToFilterMsg struct{}
 
+// RefreshMsg is sent when the user wants to re-run the same search.
+type RefreshMsg struct {
+	Filter models.Filter
+}
+
 // OpenDetailMsg is sent when the user selects a log entry.
 type OpenDetailMsg struct {
 	Entry models.LogEntry
@@ -140,6 +145,10 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	rs.notice = "" // clear previous notice on any keypress
 
 	switch msg.String() {
+	case "ctrl+r":
+		f := rs.filter
+		return rs, func() tea.Msg { return RefreshMsg{Filter: f} }
+
 	case "r":
 		return rs, func() tea.Msg { return BackToFilterMsg{} }
 
@@ -304,7 +313,7 @@ func (rs ResultsScreen) statusBar() string {
 	if rs.notice != "" {
 		right = rs.notice
 	} else {
-		right = "↑↓/jk navigate · enter detail · / filter · esc back · e export · c copy"
+		right = "↑↓/jk navigate · enter detail · / filter · r refine · ctrl+r refresh · e export · c copy"
 	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Left,

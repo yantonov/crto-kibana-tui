@@ -110,6 +110,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.active = screenFilter
 		return a, nil
 
+	// User wants to re-run the same search.
+	case screens.RefreshMsg:
+		a.active = screenFilter
+		return a, a.doSearch(msg.Filter)
+
 	// User selected a log entry.
 	case screens.OpenDetailMsg:
 		kibanaBase := a.cfg.KibanaURL(msg.Entry.DataCenter, msg.Entry.Environment)
@@ -205,6 +210,7 @@ func helpView(width, height int) string {
 		"  ↑/↓  j/k       navigate rows",
 		"  enter           open detail",
 		"  r                back to filter",
+		"  ctrl+r          refresh (re-run search)",
 		"  /                inline filter",
 		"  esc             back to filter",
 		"  e                export to NDJSON file",
