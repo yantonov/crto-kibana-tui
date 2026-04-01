@@ -13,24 +13,12 @@ import (
 // Client is a thin HTTP wrapper for the OpenSearch _search API.
 type Client struct {
 	httpClient    *http.Client
-	sessionCookie string // set after Login(); takes priority over basic auth
-	username      string // fallback for diag mode
-	password      string
+	sessionCookie string // set after Login()
 }
 
 // NewClient creates an unauthenticated Client. Call Login() before use.
 func NewClient() *Client {
 	return &Client{httpClient: &http.Client{}}
-}
-
-// NewClientWithBasicAuth creates a Client using HTTP Basic Auth.
-// Used by diagnostic mode where credentials come from env vars.
-func NewClientWithBasicAuth(username, password string) *Client {
-	return &Client{
-		httpClient: &http.Client{},
-		username:   username,
-		password:   password,
-	}
 }
 
 // Login authenticates against Kibana's /auth/login endpoint and stores the
@@ -79,13 +67,10 @@ func (c *Client) IsAuthenticated() bool {
 	return c.sessionCookie != ""
 }
 
-// addAuth injects authentication onto the request: session cookie if
-// available, otherwise HTTP Basic Auth.
+// addAuth injects the session cookie onto the request.
 func (c *Client) addAuth(req *http.Request) {
 	if c.sessionCookie != "" {
 		req.Header.Set("Cookie", c.sessionCookie)
-	} else {
-		req.SetBasicAuth(c.username, c.password)
 	}
 }
 

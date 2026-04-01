@@ -47,12 +47,37 @@ func main() {
 	}
 
 	if diag {
-		username := os.Getenv("OPENSEARCH_USERNAME")
-		password := os.Getenv("OPENSEARCH_PASSWORD")
-		if username == "" || password == "" {
-			log.Fatal("OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD must be set for --diag")
+		loginEnv := diagEnv
+		if loginEnv == "" {
+			loginEnv, _ = firstDC(cfg)
 		}
-		client := opensearch.NewClientWithBasicAuth(username, password)
+		if loginEnv == "" {
+			log.Fatal("no environments defined in config")
+		}
+		dcs, err := cfg.DataCenters(loginEnv)
+		if err != nil {
+			log.Fatalf("environment %q: %v", loginEnv, err)
+		}
+		if len(dcs) == 0 {
+			log.Fatalf("no datacenters for environment %q", loginEnv)
+		}
+		sort.Strings(dcs)
+		kibanaURL := cfg.KibanaURL(dcs[0], loginEnv)
+
+		fmt.Fprint(os.Stderr, "Username: ")
+		var username string
+		fmt.Scanln(&username)
+		fmt.Fprint(os.Stderr, "Password: ")
+		var password string
+		fmt.Scanln(&password)
+
+		client := opensearch.NewClient()
+		loginCtx, loginCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer loginCancel()
+		if err := client.Login(loginCtx, kibanaURL, username, password); err != nil {
+			log.Fatalf("login: %v", err)
+		}
+
 		runDiag(cfg, client, diagEnv, diagApp, diagTimeframe)
 		return
 	}
