@@ -82,9 +82,9 @@ func searchAll(ctx context.Context, filter models.Filter, cfg config.Provider, c
 // searchOne performs a single _search against one data center and maps hits to LogEntry.
 func searchOne(ctx context.Context, dc string, filter models.Filter, cfg config.Provider, client *Client) ([]models.LogEntry, int, error) {
 	baseURL := cfg.KibanaURL(dc, filter.Environment)
-	query := BuildQuery(filter, defaultPageSize)
+	query := buildQuery(filter, defaultPageSize)
 
-	resp, err := client.Search(ctx, baseURL, cfg.IndexPattern(), query)
+	resp, err := client.search(ctx, baseURL, cfg.IndexPattern(), query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search %s: %w", dc, err)
 	}

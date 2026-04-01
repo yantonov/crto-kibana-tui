@@ -25,12 +25,12 @@ func timeframeDSL(tf string) string {
 	}
 }
 
-// BuildQuery constructs an OpenSearch DSL query body from the given filter.
-func BuildQuery(f models.Filter, size int) map[string]interface{} {
-	filters := []interface{}{
-		map[string]interface{}{
-			"range": map[string]interface{}{
-				fieldTimestamp: map[string]interface{}{
+// buildQuery constructs a typed OpenSearch DSL query body from the given filter.
+func buildQuery(f models.Filter, size int) searchRequest {
+	filters := []queryClause{
+		{
+			"range": queryClause{
+				fieldTimestamp: queryClause{
 					"gte": timeframeDSL(f.Timeframe),
 					"lte": "now",
 				},
@@ -39,29 +39,27 @@ func BuildQuery(f models.Filter, size int) map[string]interface{} {
 	}
 
 	if f.Severity >= 0 {
-		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fieldSeverity: f.Severity},
+		filters = append(filters, queryClause{
+			"term": queryClause{fieldSeverity: f.Severity},
 		})
 	}
 	if f.Application != "" {
-		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fieldApplication: f.Application},
+		filters = append(filters, queryClause{
+			"term": queryClause{fieldApplication: f.Application},
 		})
 	}
 	if f.TraceID != "" {
-		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{fieldTraceID: f.TraceID},
+		filters = append(filters, queryClause{
+			"term": queryClause{fieldTraceID: f.TraceID},
 		})
 	}
 
-	boolQuery := map[string]interface{}{
-		"filter": filters,
-	}
+	clauses := boolClauses{Filter: filters}
 
 	if q := strings.TrimSpace(f.Query); q != "" {
-		boolQuery["must"] = []interface{}{
-			map[string]interface{}{
-				"query_string": map[string]interface{}{
+		clauses.Must = []queryClause{
+			{
+				"query_string": queryClause{
 					"query":         q,
 					"default_field": fieldMessage,
 				},
@@ -69,15 +67,11 @@ func BuildQuery(f models.Filter, size int) map[string]interface{} {
 		}
 	}
 
-	return map[string]interface{}{
-		"size": size,
-		"sort": []interface{}{
-			map[string]interface{}{
-				fieldTimestamp: map[string]interface{}{"order": "desc"},
-			},
+	return searchRequest{
+		Size: size,
+		Sort: []sortClause{
+			{fieldTimestamp: sortOrder{Order: "desc"}},
 		},
-		"query": map[string]interface{}{
-			"bool": boolQuery,
-		},
+		Query: boolWrapper{Bool: clauses},
 	}
 }

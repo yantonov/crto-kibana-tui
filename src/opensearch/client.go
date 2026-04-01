@@ -95,9 +95,8 @@ func (c *Client) Ping(ctx context.Context, kibanaURL string) error {
 	return nil
 }
 
-// Search executes a _search request via the Kibana console proxy.
-// body must be a JSON-serialisable map (as returned by BuildQuery).
-func (c *Client) Search(ctx context.Context, kibanaURL, indexPattern string, body map[string]interface{}) (*SearchResponse, error) {
+// search executes a _search request via the Kibana console proxy.
+func (c *Client) search(ctx context.Context, kibanaURL, indexPattern string, body searchRequest) (*SearchResponse, error) {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal query: %w", err)
