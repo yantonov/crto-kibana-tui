@@ -70,7 +70,7 @@ var (
 
 // FilterScreen is the initial search-parameter form.
 type FilterScreen struct {
-	cfg      *config.Config
+	cfg      config.Provider
 	width    int
 	height   int
 	focusIdx int
@@ -85,10 +85,10 @@ type FilterScreen struct {
 }
 
 // NewFilterScreen constructs a FilterScreen populated from cfg.
-func NewFilterScreen(cfg *config.Config) FilterScreen {
+func NewFilterScreen(cfg config.Provider) FilterScreen {
 	// Environments (sorted for determinism).
-	envKeys := make([]string, 0, len(config.Environments))
-	for k := range config.Environments {
+	envKeys := make([]string, 0, len(cfg.Environments()))
+	for k := range cfg.Environments() {
 		envKeys = append(envKeys, k)
 	}
 	sort.Strings(envKeys)
@@ -105,14 +105,14 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 
 	// Applications: "all" first, then list from config, then "custom..." sentinel.
 	appOpts := []components.Option{{Label: "all", Value: ""}}
-	for _, a := range cfg.Applications {
+	for _, a := range cfg.Applications() {
 		appOpts = append(appOpts, components.Option{Label: a, Value: a})
 	}
 	appOpts = append(appOpts, components.Option{Label: "custom...", Value: customAppSentinel})
 
 	// Timeframes: as-is from defaults.
-	tfOpts := make([]components.Option, len(config.Timeframes))
-	for i, tf := range config.Timeframes {
+	tfOpts := make([]components.Option, len(cfg.Timeframes()))
+	for i, tf := range cfg.Timeframes() {
 		tfOpts[i] = components.Option{Label: tf.Label, Value: tf.Value}
 	}
 

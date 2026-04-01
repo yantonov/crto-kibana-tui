@@ -1,7 +1,7 @@
 package config
 
 type Config struct {
-	Applications []string `yaml:"applications"`
+	AppNames []string `yaml:"applications"`
 }
 
 type EnvironmentConfig struct {

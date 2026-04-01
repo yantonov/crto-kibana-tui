@@ -4,9 +4,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+// Provider is the interface the rest of the application uses to access
+// configuration. Using this interface instead of *Config allows callers
+// to be tested with stub implementations.
+type Provider interface {
+	DataCenters(env string) ([]string, error)
+	KibanaURL(dc, env string) string
+	Applications() []string
+	Timeframes() []TimeframeOption
+	Environments() map[string]EnvironmentConfig
+	IndexPattern() string
+	QueryTimeout() time.Duration
+}
+
+// Compile-time assertion that *Config satisfies Provider.
+var _ Provider = (*Config)(nil)
 
 const configFileName = "config.yaml"
 
@@ -73,6 +90,31 @@ func (c *Config) DataCenters(env string) ([]string, error) {
 		return nil, fmt.Errorf("unknown environment %q", env)
 	}
 	return e.DataCenters, nil
+}
+
+// Applications returns the list of known application names.
+func (c *Config) Applications() []string {
+	return c.AppNames
+}
+
+// Timeframes returns the selectable time range options.
+func (c *Config) Timeframes() []TimeframeOption {
+	return Timeframes
+}
+
+// Environments returns the environment-to-datacenter mapping.
+func (c *Config) Environments() map[string]EnvironmentConfig {
+	return Environments
+}
+
+// IndexPattern returns the OpenSearch index pattern to query.
+func (c *Config) IndexPattern() string {
+	return IndexPattern
+}
+
+// QueryTimeout returns the per-datacenter search timeout.
+func (c *Config) QueryTimeout() time.Duration {
+	return time.Duration(QueryTimeoutSeconds) * time.Second
 }
 
 // KibanaURL builds the Kibana base URL for a given dc/env pair.

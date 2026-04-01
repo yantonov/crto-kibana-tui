@@ -29,8 +29,8 @@ const (
 // App is the root Bubble Tea model. It owns the screen-routing state machine
 // and delegates Update/View to the active screen model.
 type App struct {
-	cfg    *config.Config
-	client *opensearch.Client
+	cfg    config.Provider
+	client opensearch.Searcher
 
 	active   screen
 	showHelp bool
@@ -53,7 +53,7 @@ type App struct {
 }
 
 // New constructs the root App model.
-func New(cfg *config.Config, client *opensearch.Client) App {
+func New(cfg config.Provider, client opensearch.Searcher) App {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
@@ -268,7 +268,7 @@ func (a App) doLogin(username, password string) tea.Cmd {
 	return func() tea.Msg {
 		// Use the first available DC to authenticate.
 		var kibanaURL string
-		for e, ecfg := range config.Environments {
+		for e, ecfg := range cfg.Environments() {
 			if len(ecfg.DataCenters) > 0 {
 				kibanaURL = cfg.KibanaURL(ecfg.DataCenters[0], e)
 				break
@@ -291,7 +291,7 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 	cfg := a.cfg
 	client := a.client
 	return func() tea.Msg {
-		result := opensearch.SearchAll(context.Background(), filter, cfg, client)
+		result := client.SearchAll(context.Background(), cfg, filter)
 		return SearchDoneMsg{Result: result, Filter: filter}
 	}
 }

@@ -14,10 +14,16 @@ import (
 
 const defaultPageSize = 500
 
-// SearchAll runs a parallel search across all data centers for the given environment
-// and returns a combined, timestamp-sorted result. Per-DC errors do not abort the
-// overall search — they are collected in CombinedResult.DCErrors.
-func SearchAll(ctx context.Context, filter models.Filter, cfg *config.Config, client *Client) models.CombinedResult {
+// SearchAll implements Searcher.SearchAll. It runs a parallel search across all
+// data centers for the given environment and returns a combined, timestamp-sorted
+// result. Per-DC errors do not abort the overall search — they are collected in
+// CombinedResult.DCErrors.
+func (c *Client) SearchAll(ctx context.Context, cfg config.Provider, filter models.Filter) models.CombinedResult {
+	return searchAll(ctx, filter, cfg, c)
+}
+
+// searchAll is the internal implementation shared by (*Client).SearchAll.
+func searchAll(ctx context.Context, filter models.Filter, cfg config.Provider, client *Client) models.CombinedResult {
 	dcs, err := cfg.DataCenters(filter.Environment)
 	if err != nil {
 		return models.CombinedResult{
@@ -35,7 +41,7 @@ func SearchAll(ctx context.Context, filter models.Filter, cfg *config.Config, cl
 	resultCh := make(chan dcResult, len(dcs))
 
 	g, gctx := errgroup.WithContext(ctx)
-	timeout := time.Duration(config.QueryTimeoutSeconds) * time.Second
+	timeout := cfg.QueryTimeout()
 
 	for _, dc := range dcs {
 		dc := dc // capture
@@ -74,11 +80,11 @@ func SearchAll(ctx context.Context, filter models.Filter, cfg *config.Config, cl
 }
 
 // searchOne performs a single _search against one data center and maps hits to LogEntry.
-func searchOne(ctx context.Context, dc string, filter models.Filter, cfg *config.Config, client *Client) ([]models.LogEntry, int, error) {
+func searchOne(ctx context.Context, dc string, filter models.Filter, cfg config.Provider, client *Client) ([]models.LogEntry, int, error) {
 	baseURL := cfg.KibanaURL(dc, filter.Environment)
 	query := BuildQuery(filter, defaultPageSize)
 
-	resp, err := client.Search(ctx, baseURL, config.IndexPattern, query)
+	resp, err := client.Search(ctx, baseURL, cfg.IndexPattern(), query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("search %s: %w", dc, err)
 	}
