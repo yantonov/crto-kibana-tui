@@ -2,8 +2,10 @@ package tui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
@@ -40,15 +42,24 @@ type App struct {
 	// populated after a search completes
 	result      models.CombinedResult
 	selectedIdx int
+
+	// loading state while search is in-flight
+	loading       bool
+	loadingFilter models.Filter
+	spinner       spinner.Model
 }
 
 // New constructs the root App model.
 func New(cfg *config.Config, client *opensearch.Client) App {
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
 	return App{
 		cfg:          cfg,
 		client:       client,
 		active:       screenFilter,
 		filterScreen: screens.NewFilterScreen(cfg),
+		spinner:      s,
 	}
 }
 
@@ -95,15 +106,24 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Search was triggered from FilterScreen.
 	case screens.SearchStartedMsg:
 		a.active = screenResults
-		return a, a.doSearch(msg.Filter)
+		a.loading = true
+		a.loadingFilter = msg.Filter
+		return a, tea.Batch(a.doSearch(msg.Filter), a.spinner.Tick)
 
 	// Parallel search completed.
 	case SearchDoneMsg:
+		a.loading = false
 		a.result = msg.Result
 		a.selectedIdx = 0
 		a.resultsScreen = screens.NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
 		a.active = screenResults
 		return a, nil
+
+	// Spinner tick while loading.
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		a.spinner, cmd = a.spinner.Update(msg)
+		return a, cmd
 
 	// User wants to refine the search.
 	case screens.BackToFilterMsg:
@@ -112,8 +132,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// User wants to re-run the same search.
 	case screens.RefreshMsg:
-		a.active = screenFilter
-		return a, a.doSearch(msg.Filter)
+		a.active = screenResults
+		a.loading = true
+		a.loadingFilter = msg.Filter
+		return a, tea.Batch(a.doSearch(msg.Filter), a.spinner.Tick)
 
 	// User selected a log entry.
 	case screens.OpenDetailMsg:
@@ -160,12 +182,50 @@ func (a App) View() string {
 	case screenFilter:
 		return a.filterScreen.View()
 	case screenResults:
+		if a.loading {
+			return a.loadingView()
+		}
 		return a.resultsScreen.View()
 	case screenDetail:
 		return a.detailScreen.View()
 	default:
 		return ""
 	}
+}
+
+var (
+	loadingBarStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#111827")).
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 1)
+
+	loadingHighlight = lipgloss.NewStyle().
+				Background(lipgloss.Color("#111827")).
+				Foreground(lipgloss.Color("#C4B5FD"))
+)
+
+func (a App) loadingView() string {
+	f := a.loadingFilter
+	hi := loadingHighlight.Render
+
+	app := "all"
+	if f.Application != "" {
+		app = f.Application
+	}
+	sev := "all"
+	if f.Severity >= 0 {
+		sev = models.SeverityLabel(f.Severity)
+	}
+
+	summary := fmt.Sprintf("env:%s  app:%s  severity:%s  timeframe:%s",
+		hi(f.Environment), hi(app), hi(sev), hi(f.Timeframe))
+	if f.TraceID != "" {
+		summary += fmt.Sprintf("  trace:%s", hi(f.TraceID))
+	}
+
+	bar := loadingBarStyle.Width(a.width).Render(summary)
+	msg := "\n  " + a.spinner.View() + " Searching…"
+	return bar + msg
 }
 
 // doSearch launches the parallel OpenSearch fanout as a tea.Cmd.
