@@ -331,6 +331,9 @@ func (rs ResultsScreen) filterSummary() string {
 
 	line := fmt.Sprintf("env:%s  app:%s  severity:%s  timeframe:%s",
 		hi(f.Environment), hi(app), hi(sev), hi(f.Timeframe))
+	if f.TraceID != "" {
+		line += fmt.Sprintf("  trace:%s", hi(f.TraceID))
+	}
 	return resultsFilterBar.Width(rs.width).Render(line)
 }
 
