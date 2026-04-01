@@ -24,14 +24,23 @@ const (
 	fieldEnv       = 0
 	fieldSeverity  = 1
 	fieldApp       = 2
-	fieldTimeframe = 3
-	fieldTraceID   = 4
-	fieldQuery     = 5
-	fieldCount     = 6
+	fieldAppCustom = 3 // only reachable when "custom..." is selected in appDD
+	fieldTimeframe = 4
+	fieldTraceID   = 5
+	fieldQuery     = 6
+	fieldCount     = 7
 )
 
+// customAppSentinel is the Option.Value used to signal "user will type a name".
+const customAppSentinel = "__custom__"
+
+// maxAppNameLen is the maximum allowed application name length.
+// OpenSearch field length is capped at the length of the longest known app name:
+// "cbsbluecatalog-retailmedia-inventory-catalogexpo".
+const maxAppNameLen = len("cbsbluecatalog-retailmedia-inventory-catalogexpo")
+
 // inputWidth matches the inner content width of the dropdown component.
-const inputWidth = 30
+const inputWidth = 50
 
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -66,12 +75,13 @@ type FilterScreen struct {
 	height   int
 	focusIdx int
 
-	envDD       components.Dropdown
-	severityDD  components.Dropdown
-	appDD       components.Dropdown
-	timeframeDD components.Dropdown
-	traceInput  textinput.Model
-	queryInput  textinput.Model
+	envDD          components.Dropdown
+	severityDD     components.Dropdown
+	appDD          components.Dropdown
+	appCustomInput textinput.Model
+	timeframeDD    components.Dropdown
+	traceInput     textinput.Model
+	queryInput     textinput.Model
 }
 
 // NewFilterScreen constructs a FilterScreen populated from cfg.
@@ -93,11 +103,12 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 		sevOpts = append(sevOpts, components.Option{Label: pair[0], Value: pair[1]})
 	}
 
-	// Applications: "all" first, then list from config.
+	// Applications: "all" first, then list from config, then "custom..." sentinel.
 	appOpts := []components.Option{{Label: "all", Value: ""}}
 	for _, a := range cfg.Applications {
 		appOpts = append(appOpts, components.Option{Label: a, Value: a})
 	}
+	appOpts = append(appOpts, components.Option{Label: "custom...", Value: customAppSentinel})
 
 	// Timeframes: as-is from defaults.
 	tfOpts := make([]components.Option, len(config.Timeframes))
@@ -105,13 +116,18 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 		tfOpts[i] = components.Option{Label: tf.Label, Value: tf.Value}
 	}
 
+	appCustomIn := textinput.New()
+	appCustomIn.Placeholder = "application name"
+	appCustomIn.CharLimit = 256
+	appCustomIn.Width = inputWidth
+
 	traceIn := textinput.New()
 	traceIn.Placeholder = "optional"
 	traceIn.CharLimit = 128
 	traceIn.Width = inputWidth
 
 	queryIn := textinput.New()
-	queryIn.Placeholder = "Lucene / KQL"
+	queryIn.Placeholder = "Text"
 	queryIn.CharLimit = 512
 	queryIn.Width = inputWidth
 
@@ -122,13 +138,14 @@ func NewFilterScreen(cfg *config.Config) FilterScreen {
 	timeframeDD.SetByValue("3h")
 
 	fs := FilterScreen{
-		cfg:         cfg,
-		envDD:       components.New(envOpts),
-		severityDD:  severityDD,
-		appDD:       components.New(appOpts),
-		timeframeDD: timeframeDD,
-		traceInput:  traceIn,
-		queryInput:  queryIn,
+		cfg:            cfg,
+		envDD:          components.New(envOpts),
+		severityDD:     severityDD,
+		appDD:          components.New(appOpts),
+		appCustomInput: appCustomIn,
+		timeframeDD:    timeframeDD,
+		traceInput:     traceIn,
+		queryInput:     queryIn,
 	}
 	fs.syncFocus()
 	return fs
@@ -163,14 +180,20 @@ func (f FilterScreen) Update(msg tea.Msg) (FilterScreen, tea.Cmd) {
 	switch key.String() {
 	case "tab":
 		f.collapseActiveDrop()
-		f.focusIdx = (f.focusIdx + 1) % fieldCount
+		f.focusIdx = f.nextField()
 		f.syncFocus()
 		return f, nil
 	case "shift+tab":
 		f.collapseActiveDrop()
-		f.focusIdx = (f.focusIdx - 1 + fieldCount) % fieldCount
+		f.focusIdx = f.prevField()
 		f.syncFocus()
 		return f, nil
+	}
+
+	// When the app dropdown changes selection away from custom, leave fieldAppCustom.
+	if f.focusIdx == fieldAppCustom && !f.isCustomApp() {
+		f.focusIdx = fieldApp
+		f.syncFocus()
 	}
 
 	// Route the key to the active field.
@@ -179,10 +202,18 @@ func (f FilterScreen) Update(msg tea.Msg) (FilterScreen, tea.Cmd) {
 
 // View renders the filter form.
 func (f FilterScreen) View() string {
+	appField := f.appDD.View()
+	if f.appDD.Selected().Value == customAppSentinel {
+		appField = lipgloss.JoinVertical(lipgloss.Left,
+			appField,
+			f.wrapInput(f.appCustomInput, f.focusIdx == fieldAppCustom),
+		)
+	}
+
 	rows := []string{
 		f.row("Environment", f.envDD.View()),
 		f.row("Severity", f.severityDD.View()),
-		f.row("Application", f.appDD.View()),
+		f.row("Application", appField),
 		f.row("Timeframe", f.timeframeDD.View()),
 		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
 		f.row("Query", f.wrapInput(f.queryInput, f.focusIdx == fieldQuery)),
@@ -209,6 +240,11 @@ func (f *FilterScreen) syncFocus() {
 	f.appDD.SetFocused(f.focusIdx == fieldApp)
 	f.timeframeDD.SetFocused(f.focusIdx == fieldTimeframe)
 
+	if f.focusIdx == fieldAppCustom {
+		f.appCustomInput.Focus()
+	} else {
+		f.appCustomInput.Blur()
+	}
 	if f.focusIdx == fieldTraceID {
 		f.traceInput.Focus()
 	} else {
@@ -219,6 +255,26 @@ func (f *FilterScreen) syncFocus() {
 	} else {
 		f.queryInput.Blur()
 	}
+}
+
+func (f *FilterScreen) isCustomApp() bool {
+	return f.appDD.Selected().Value == customAppSentinel
+}
+
+func (f *FilterScreen) nextField() int {
+	next := (f.focusIdx + 1) % fieldCount
+	if next == fieldAppCustom && !f.isCustomApp() {
+		next = (next + 1) % fieldCount
+	}
+	return next
+}
+
+func (f *FilterScreen) prevField() int {
+	prev := (f.focusIdx - 1 + fieldCount) % fieldCount
+	if prev == fieldAppCustom && !f.isCustomApp() {
+		prev = (prev - 1 + fieldCount) % fieldCount
+	}
+	return prev
 }
 
 func (f *FilterScreen) collapseActiveDrop() {
@@ -242,6 +298,10 @@ func (f FilterScreen) routeKey(key tea.KeyMsg) (FilterScreen, tea.Cmd) {
 		f.severityDD, _ = f.severityDD.Update(key)
 	case fieldApp:
 		f.appDD, _ = f.appDD.Update(key)
+	case fieldAppCustom:
+		var cmd tea.Cmd
+		f.appCustomInput, cmd = f.appCustomInput.Update(key)
+		return f, cmd
 	case fieldTimeframe:
 		f.timeframeDD, _ = f.timeframeDD.Update(key)
 	case fieldTraceID:
@@ -258,6 +318,10 @@ func (f FilterScreen) routeKey(key tea.KeyMsg) (FilterScreen, tea.Cmd) {
 
 func (f FilterScreen) updateActiveInput(msg tea.Msg) (FilterScreen, tea.Cmd) {
 	switch f.focusIdx {
+	case fieldAppCustom:
+		var cmd tea.Cmd
+		f.appCustomInput, cmd = f.appCustomInput.Update(msg)
+		return f, cmd
 	case fieldTraceID:
 		var cmd tea.Cmd
 		f.traceInput, cmd = f.traceInput.Update(msg)
@@ -277,10 +341,18 @@ func (f FilterScreen) triggerSearch() tea.Cmd {
 			severity = n
 		}
 	}
+	app := f.appDD.Selected().Value
+	if app == customAppSentinel {
+		app = strings.TrimSpace(f.appCustomInput.Value())
+	}
+	app = strings.ReplaceAll(app, "/", "-")
+	if runes := []rune(app); len(runes) > maxAppNameLen {
+		app = string(runes[:maxAppNameLen])
+	}
 	filter := models.Filter{
 		Environment: f.envDD.Selected().Value,
 		Severity:    severity,
-		Application: f.appDD.Selected().Value,
+		Application: app,
 		Timeframe:   f.timeframeDD.Selected().Value,
 		TraceID:     strings.TrimSpace(f.traceInput.Value()),
 		Query:       strings.TrimSpace(f.queryInput.Value()),

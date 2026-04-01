@@ -8,7 +8,7 @@ import (
 )
 
 // innerWidth is the text content width inside the dropdown border box.
-const innerWidth = 28
+const innerWidth = 50
 
 var (
 	styleFocused = lipgloss.NewStyle().

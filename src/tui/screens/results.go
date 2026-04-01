@@ -35,11 +35,21 @@ var (
 				BorderStyle(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7C3AED")).
 				PaddingLeft(1).PaddingRight(1)
+
+	resultsFilterBar = lipgloss.NewStyle().
+			Background(lipgloss.Color("#111827")).
+			Foreground(lipgloss.Color("#9CA3AF")).
+			Padding(0, 1)
+
+	resultsFilterHighlight = lipgloss.NewStyle().
+				Background(lipgloss.Color("#111827")).
+				Foreground(lipgloss.Color("#C4B5FD"))
 )
 
 // ResultsScreen displays the merged search results in a table.
 type ResultsScreen struct {
 	result  models.CombinedResult
+	filter  models.Filter
 	allDCs  []string // sorted list of all DCs that were searched
 	ready   bool     // true after NewResultsScreen has been called
 
@@ -54,7 +64,7 @@ type ResultsScreen struct {
 }
 
 // NewResultsScreen constructs a ResultsScreen from the combined search result.
-func NewResultsScreen(result models.CombinedResult, width, height int) ResultsScreen {
+func NewResultsScreen(result models.CombinedResult, filter models.Filter, width, height int) ResultsScreen {
 	dcSet := make(map[string]struct{})
 	for _, e := range result.Entries {
 		dcSet[e.DataCenter] = struct{}{}
@@ -74,6 +84,7 @@ func NewResultsScreen(result models.CombinedResult, width, height int) ResultsSc
 
 	rs := ResultsScreen{
 		result:      result,
+		filter:      filter,
 		allDCs:      allDCs,
 		filterInput: fi,
 		width:       width,
@@ -113,6 +124,7 @@ func (rs ResultsScreen) View() string {
 
 	var parts []string
 
+	parts = append(parts, rs.filterSummary())
 	if rs.filtering {
 		parts = append(parts, "  / "+resultsFilterInput.Render(rs.filterInput.View()))
 	}
@@ -213,8 +225,8 @@ func (rs ResultsScreen) visibleEntries() []models.LogEntry {
 }
 
 func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
-	// Leave room for status bar (1) and optional filter input (1), plus table header.
-	tableHeight := rs.height - 3
+	// Leave room for filter summary (1), status bar (1), optional filter input (1), plus table header.
+	tableHeight := rs.height - 4
 	if tableHeight < 3 {
 		tableHeight = 3
 	}
@@ -301,6 +313,25 @@ func (rs ResultsScreen) statusBar() string {
 		right,
 	)
 	return resultsStatusBar.Width(rs.width).Render(content)
+}
+
+func (rs ResultsScreen) filterSummary() string {
+	f := rs.filter
+	hi := resultsFilterHighlight.Render
+
+	app := "all"
+	if f.Application != "" {
+		app = f.Application
+	}
+
+	sev := "all"
+	if f.Severity >= 0 {
+		sev = models.SeverityLabel(f.Severity)
+	}
+
+	line := fmt.Sprintf("env:%s  app:%s  severity:%s  timeframe:%s",
+		hi(f.Environment), hi(app), hi(sev), hi(f.Timeframe))
+	return resultsFilterBar.Width(rs.width).Render(line)
 }
 
 func truncate(s string, n int) string {

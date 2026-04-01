@@ -101,7 +101,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SearchDoneMsg:
 		a.result = msg.Result
 		a.selectedIdx = 0
-		a.resultsScreen = screens.NewResultsScreen(msg.Result, a.width, a.height)
+		a.resultsScreen = screens.NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
 		a.active = screenResults
 		return a, nil
 
@@ -169,7 +169,7 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 	client := a.client
 	return func() tea.Msg {
 		result := opensearch.SearchAll(context.Background(), filter, cfg, client)
-		return SearchDoneMsg{Result: result}
+		return SearchDoneMsg{Result: result, Filter: filter}
 	}
 }
 
