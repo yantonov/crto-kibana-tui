@@ -165,7 +165,7 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 		entries := rs.visibleEntries()
 		cur := rs.tbl.Cursor()
 		if cur >= 0 && cur < len(entries) {
-			if err := export.CopyText(entries[cur].RawJSON); err != nil {
+			if err := export.CopyJSON(entries[cur].RawJSON); err != nil {
 				rs.notice = "copy failed: " + err.Error()
 			} else {
 				rs.notice = "copied to clipboard"

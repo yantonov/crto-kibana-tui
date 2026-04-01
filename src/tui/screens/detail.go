@@ -94,7 +94,7 @@ func (ds DetailScreen) Update(msg tea.Msg) (DetailScreen, tea.Cmd) {
 			ds.vp.SetContent(ds.bodyContent())
 			return ds, nil
 		case "c":
-			if err := export.CopyText(ds.entry.RawJSON); err != nil {
+			if err := export.CopyJSON(ds.entry.RawJSON); err != nil {
 				ds.notice = "copy failed: " + err.Error()
 			} else {
 				ds.notice = "copied to clipboard"
