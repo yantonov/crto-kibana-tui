@@ -1,4 +1,4 @@
-package screens
+package tui
 
 import (
 	"encoding/json"
@@ -12,9 +12,6 @@ import (
 	"github.com/criteo/klt/src/export"
 	"github.com/criteo/klt/src/models"
 )
-
-// BackToResultsMsg is sent when the user presses Esc/b on the detail screen.
-type BackToResultsMsg struct{}
 
 // headerLines is the number of lines consumed by the header, separator, and
 // status bar so that the viewport height can be computed correctly.

@@ -1,4 +1,4 @@
-package screens
+package tui
 
 import (
 	"fmt"
@@ -13,19 +13,6 @@ import (
 	"github.com/criteo/klt/src/export"
 	"github.com/criteo/klt/src/models"
 )
-
-// BackToFilterMsg is sent when the user wants to refine the search.
-type BackToFilterMsg struct{}
-
-// RefreshMsg is sent when the user wants to re-run the same search.
-type RefreshMsg struct {
-	Filter models.Filter
-}
-
-// OpenDetailMsg is sent when the user selects a log entry.
-type OpenDetailMsg struct {
-	Entry models.LogEntry
-}
 
 var (
 	resultsStatusBar = lipgloss.NewStyle().

@@ -1,4 +1,4 @@
-package screens
+package tui
 
 import (
 	"sort"
@@ -13,11 +13,6 @@ import (
 	"github.com/criteo/klt/src/models"
 	"github.com/criteo/klt/src/tui/components"
 )
-
-// SearchStartedMsg is sent when the user triggers a search from the filter screen.
-type SearchStartedMsg struct {
-	Filter models.Filter
-}
 
 // field indices — order matches tab navigation.
 const (

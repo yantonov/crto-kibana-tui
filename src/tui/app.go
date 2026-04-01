@@ -13,7 +13,6 @@ import (
 	"github.com/criteo/klt/src/config"
 	"github.com/criteo/klt/src/models"
 	"github.com/criteo/klt/src/opensearch"
-	"github.com/criteo/klt/src/tui/screens"
 )
 
 // screen identifies which screen is currently active.
@@ -37,10 +36,10 @@ type App struct {
 	width    int
 	height   int
 
-	loginScreen   screens.LoginScreen
-	filterScreen  screens.FilterScreen
-	resultsScreen screens.ResultsScreen
-	detailScreen  screens.DetailScreen
+	loginScreen   LoginScreen
+	filterScreen  FilterScreen
+	resultsScreen ResultsScreen
+	detailScreen  DetailScreen
 
 	// populated after a search completes
 	result      models.CombinedResult
@@ -61,8 +60,8 @@ func New(cfg config.Provider, client opensearch.Searcher) App {
 		cfg:          cfg,
 		client:       client,
 		active:       screenLogin,
-		loginScreen:  screens.NewLoginScreen(),
-		filterScreen: screens.NewFilterScreen(cfg),
+		loginScreen:  NewLoginScreen(),
+		filterScreen: NewFilterScreen(cfg),
 		spinner:      s,
 	}
 }
@@ -111,7 +110,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	// User submitted the login form.
-	case screens.LoginSubmitMsg:
+	case LoginSubmitMsg:
 		a.loading = true
 		return a, tea.Batch(a.doLogin(msg.Username, msg.Password), a.spinner.Tick)
 
@@ -128,7 +127,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, nil
 
 	// Search was triggered from FilterScreen.
-	case screens.SearchStartedMsg:
+	case SearchStartedMsg:
 		a.active = screenResults
 		a.loading = true
 		a.loadingFilter = msg.Filter
@@ -139,7 +138,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.loading = false
 		a.result = msg.Result
 		a.selectedIdx = 0
-		a.resultsScreen = screens.NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
+		a.resultsScreen = NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
 		a.active = screenResults
 		return a, nil
 
@@ -150,26 +149,26 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return a, cmd
 
 	// User wants to refine the search.
-	case screens.BackToFilterMsg:
+	case BackToFilterMsg:
 		a.active = screenFilter
 		return a, nil
 
 	// User wants to re-run the same search.
-	case screens.RefreshMsg:
+	case RefreshMsg:
 		a.active = screenResults
 		a.loading = true
 		a.loadingFilter = msg.Filter
 		return a, tea.Batch(a.doSearch(msg.Filter), a.spinner.Tick)
 
 	// User selected a log entry.
-	case screens.OpenDetailMsg:
+	case OpenDetailMsg:
 		kibanaBase := a.cfg.KibanaURL(msg.Entry.DataCenter, msg.Entry.Environment)
-		a.detailScreen = screens.NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
+		a.detailScreen = NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
 		a.active = screenDetail
 		return a, nil
 
 	// User navigates back from detail to results.
-	case screens.BackToResultsMsg:
+	case BackToResultsMsg:
 		a.active = screenResults
 		return a, nil
 	}

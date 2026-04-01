@@ -1,4 +1,4 @@
-package screens
+package tui
 
 import (
 	"strings"
@@ -7,12 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
-
-// LoginSubmitMsg is sent when the user submits the login form.
-type LoginSubmitMsg struct {
-	Username string
-	Password string
-}
 
 const (
 	loginFieldUsername = 0
