@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,7 +20,8 @@ import (
 type screen int
 
 const (
-	screenFilter screen = iota
+	screenLogin screen = iota
+	screenFilter
 	screenResults
 	screenDetail
 )
@@ -35,6 +37,7 @@ type App struct {
 	width    int
 	height   int
 
+	loginScreen   screens.LoginScreen
 	filterScreen  screens.FilterScreen
 	resultsScreen screens.ResultsScreen
 	detailScreen  screens.DetailScreen
@@ -43,7 +46,7 @@ type App struct {
 	result      models.CombinedResult
 	selectedIdx int
 
-	// loading state while search is in-flight
+	// loading state while search is in-flight or login is in-flight
 	loading       bool
 	loadingFilter models.Filter
 	spinner       spinner.Model
@@ -57,7 +60,8 @@ func New(cfg *config.Config, client *opensearch.Client) App {
 	return App{
 		cfg:          cfg,
 		client:       client,
-		active:       screenFilter,
+		active:       screenLogin,
+		loginScreen:  screens.NewLoginScreen(),
 		filterScreen: screens.NewFilterScreen(cfg),
 		spinner:      s,
 	}
@@ -65,7 +69,7 @@ func New(cfg *config.Config, client *opensearch.Client) App {
 
 // Init satisfies tea.Model.
 func (a App) Init() tea.Cmd {
-	return a.filterScreen.Init()
+	return a.loginScreen.Init()
 }
 
 // Update is the root message dispatcher.
@@ -76,6 +80,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.width = msg.Width
 		a.height = msg.Height
 		// Update every screen so dimensions are correct on any transition.
+		a.loginScreen, _ = a.loginScreen.Update(msg)
 		a.filterScreen, _ = a.filterScreen.Update(msg)
 		a.resultsScreen, _ = a.resultsScreen.Update(msg)
 		a.detailScreen, _ = a.detailScreen.Update(msg)
@@ -86,7 +91,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return a, tea.Quit
 		case "?":
-			a.showHelp = !a.showHelp
+			if a.active != screenLogin {
+				a.showHelp = !a.showHelp
+			}
 			return a, nil
 		case "esc":
 			if a.showHelp {
@@ -102,6 +109,23 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.showHelp = false
 			return a, nil
 		}
+
+	// User submitted the login form.
+	case screens.LoginSubmitMsg:
+		a.loading = true
+		return a, tea.Batch(a.doLogin(msg.Username, msg.Password), a.spinner.Tick)
+
+	// Login succeeded.
+	case LoginDoneMsg:
+		a.loading = false
+		a.active = screenFilter
+		return a, a.filterScreen.Init()
+
+	// Login failed.
+	case loginErrMsg:
+		a.loading = false
+		a.loginScreen = a.loginScreen.SetError(msg.err.Error())
+		return a, nil
 
 	// Search was triggered from FilterScreen.
 	case screens.SearchStartedMsg:
@@ -156,6 +180,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Delegate to the active screen.
 	switch a.active {
+	case screenLogin:
+		var cmd tea.Cmd
+		a.loginScreen, cmd = a.loginScreen.Update(msg)
+		return a, cmd
 	case screenFilter:
 		var cmd tea.Cmd
 		a.filterScreen, cmd = a.filterScreen.Update(msg)
@@ -179,6 +207,11 @@ func (a App) View() string {
 		return helpView(a.width, a.height)
 	}
 	switch a.active {
+	case screenLogin:
+		if a.loading {
+			return a.loginScreen.View() + "\n\n  " + a.spinner.View() + " Authenticating…"
+		}
+		return a.loginScreen.View()
 	case screenFilter:
 		return a.filterScreen.View()
 	case screenResults:
@@ -226,6 +259,31 @@ func (a App) loadingView() string {
 	bar := loadingBarStyle.Width(a.width).Render(summary)
 	msg := "\n  " + a.spinner.View() + " Searching…"
 	return bar + msg
+}
+
+// doLogin performs the authentication request as a tea.Cmd.
+func (a App) doLogin(username, password string) tea.Cmd {
+	cfg := a.cfg
+	client := a.client
+	return func() tea.Msg {
+		// Use the first available DC to authenticate.
+		var kibanaURL string
+		for e, ecfg := range config.Environments {
+			if len(ecfg.DataCenters) > 0 {
+				kibanaURL = cfg.KibanaURL(ecfg.DataCenters[0], e)
+				break
+			}
+		}
+		if kibanaURL == "" {
+			return loginErrMsg{err: fmt.Errorf("no environments configured")}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := client.Login(ctx, kibanaURL, username, password); err != nil {
+			return loginErrMsg{err: err}
+		}
+		return LoginDoneMsg{}
+	}
 }
 
 // doSearch launches the parallel OpenSearch fanout as a tea.Cmd.

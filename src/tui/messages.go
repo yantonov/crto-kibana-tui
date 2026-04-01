@@ -7,3 +7,9 @@ type SearchDoneMsg struct {
 	Result models.CombinedResult
 	Filter models.Filter
 }
+
+// LoginDoneMsg is sent when the login request succeeds.
+type LoginDoneMsg struct{}
+
+// loginErrMsg is sent when the login request fails.
+type loginErrMsg struct{ err error }
