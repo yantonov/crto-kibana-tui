@@ -119,24 +119,7 @@ func (c *Config) QueryTimeout() time.Duration {
 
 // KibanaURL builds the Kibana base URL for a given dc/env pair.
 func (c *Config) KibanaURL(dc, env string) string {
-	url := "https://kibana.{dc}.{env}.crto.in"
-	url = replaceAll(url, "{dc}", dc)
-	url = replaceAll(url, "{env}", env)
-	return url
-}
-
-func replaceAll(s, old, new string) string {
-	result := ""
-	for i := 0; i < len(s); {
-		if i+len(old) <= len(s) && s[i:i+len(old)] == old {
-			result += new
-			i += len(old)
-		} else {
-			result += string(s[i])
-			i++
-		}
-	}
-	return result
+	return fmt.Sprintf("https://kibana.%s.%s.crto.in", dc, env)
 }
 
 const configTemplate = `applications:
