@@ -75,20 +75,18 @@ func NewLoginScreen() LoginScreen {
 	}
 }
 
-// SetError sets an error message to display below the form.
-func (l LoginScreen) SetError(msg string) LoginScreen {
-	l.errMsg = msg
-	return l
-}
-
 // Init satisfies tea.Model.
 func (l LoginScreen) Init() tea.Cmd {
 	return textinput.Blink
 }
 
 // Update handles messages for the login screen.
-func (l LoginScreen) Update(msg tea.Msg) (LoginScreen, tea.Cmd) {
+func (l LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case loginErrMsg:
+		l.errMsg = msg.err.Error()
+		return l, nil
+
 	case tea.WindowSizeMsg:
 		l.width = msg.Width
 		l.height = msg.Height
@@ -109,7 +107,8 @@ func (l LoginScreen) Update(msg tea.Msg) (LoginScreen, tea.Cmd) {
 		}
 	}
 
-	return l.updateActiveInput(msg)
+	updated, cmd := l.updateActiveInput(msg)
+	return updated, cmd
 }
 
 // View renders the login form.

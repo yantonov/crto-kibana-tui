@@ -91,7 +91,7 @@ func NewResultsScreen(result models.CombinedResult, filter models.Filter, width,
 func (rs ResultsScreen) Init() tea.Cmd { return nil }
 
 // Update handles all messages for the results screen.
-func (rs ResultsScreen) Update(msg tea.Msg) (ResultsScreen, tea.Cmd) {
+func (rs ResultsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		rs.width = msg.Width
@@ -101,9 +101,11 @@ func (rs ResultsScreen) Update(msg tea.Msg) (ResultsScreen, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if rs.filtering {
-			return rs.handleFilterKey(msg)
+			updated, cmd := rs.handleFilterKey(msg)
+			return updated, cmd
 		}
-		return rs.handleKey(msg)
+		updated, cmd := rs.handleKey(msg)
+		return updated, cmd
 	}
 	return rs, nil
 }

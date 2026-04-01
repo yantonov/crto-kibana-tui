@@ -152,7 +152,7 @@ func (f FilterScreen) Init() tea.Cmd {
 }
 
 // Update handles all messages for the filter screen.
-func (f FilterScreen) Update(msg tea.Msg) (FilterScreen, tea.Cmd) {
+func (f FilterScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if ws, ok := msg.(tea.WindowSizeMsg); ok {
 		f.width = ws.Width
 		f.height = ws.Height
@@ -163,7 +163,8 @@ func (f FilterScreen) Update(msg tea.Msg) (FilterScreen, tea.Cmd) {
 
 	if !isKey {
 		// Forward to the active textinput for cursor-blink ticks etc.
-		return f.updateActiveInput(msg)
+		updated, cmd := f.updateActiveInput(msg)
+		return updated, cmd
 	}
 
 	// Global shortcut — trigger search.
@@ -192,7 +193,8 @@ func (f FilterScreen) Update(msg tea.Msg) (FilterScreen, tea.Cmd) {
 	}
 
 	// Route the key to the active field.
-	return f.routeKey(key)
+	updated, cmd := f.routeKey(key)
+	return updated, cmd
 }
 
 // View renders the filter form.

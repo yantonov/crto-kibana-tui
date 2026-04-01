@@ -72,7 +72,7 @@ func NewDetailScreen(entry models.LogEntry, kibanaBaseURL string, width, height 
 func (ds DetailScreen) Init() tea.Cmd { return nil }
 
 // Update handles all messages for the detail screen.
-func (ds DetailScreen) Update(msg tea.Msg) (DetailScreen, tea.Cmd) {
+func (ds DetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		ds.width = msg.Width

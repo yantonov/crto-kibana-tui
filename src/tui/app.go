@@ -15,40 +15,26 @@ import (
 	"github.com/criteo/klt/src/opensearch"
 )
 
-// screen identifies which screen is currently active.
-type screen int
-
-const (
-	screenLogin screen = iota
-	screenFilter
-	screenResults
-	screenDetail
-)
-
 // App is the root Bubble Tea model. It owns the screen-routing state machine
-// and delegates Update/View to the active screen model.
+// and delegates Update/View to the active Screen.
 type App struct {
 	cfg    config.Provider
 	client opensearch.Searcher
 
-	active   screen
+	screen   Screen
 	showHelp bool
 	width    int
 	height   int
 
-	loginScreen   LoginScreen
-	filterScreen  FilterScreen
-	resultsScreen ResultsScreen
-	detailScreen  DetailScreen
-
-	// populated after a search completes
-	result      models.CombinedResult
-	selectedIdx int
-
-	// loading state while search is in-flight or login is in-flight
+	// loading state while a search or login is in-flight
 	loading       bool
 	loadingFilter models.Filter
-	spinner       spinner.Model
+
+	// stored so the results screen can be rebuilt when navigating back from detail
+	lastResult models.CombinedResult
+	lastFilter models.Filter
+
+	spinner spinner.Model
 }
 
 // New constructs the root App model.
@@ -57,18 +43,16 @@ func New(cfg config.Provider, client opensearch.Searcher) App {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
 	return App{
-		cfg:          cfg,
-		client:       client,
-		active:       screenLogin,
-		loginScreen:  NewLoginScreen(),
-		filterScreen: NewFilterScreen(cfg),
-		spinner:      s,
+		cfg:     cfg,
+		client:  client,
+		screen:  NewLoginScreen(),
+		spinner: s,
 	}
 }
 
 // Init satisfies tea.Model.
 func (a App) Init() tea.Cmd {
-	return a.loginScreen.Init()
+	return a.screen.Init()
 }
 
 // Update is the root message dispatcher.
@@ -78,19 +62,16 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		a.width = msg.Width
 		a.height = msg.Height
-		// Update every screen so dimensions are correct on any transition.
-		a.loginScreen, _ = a.loginScreen.Update(msg)
-		a.filterScreen, _ = a.filterScreen.Update(msg)
-		a.resultsScreen, _ = a.resultsScreen.Update(msg)
-		a.detailScreen, _ = a.detailScreen.Update(msg)
-		return a, nil
+		model, cmd := a.screen.Update(msg)
+		a.screen = model
+		return a, cmd
 
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return a, tea.Quit
 		case "?":
-			if a.active != screenLogin {
+			if _, isLogin := a.screen.(LoginScreen); !isLogin {
 				a.showHelp = !a.showHelp
 			}
 			return a, nil
@@ -99,12 +80,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.showHelp = false
 				return a, nil
 			}
-			if a.active == screenFilter {
+			if _, isFilter := a.screen.(FilterScreen); isFilter {
 				return a, tea.Quit
 			}
 		}
 		if a.showHelp {
-			// All other keys close the help overlay.
+			// Any other key closes the help overlay.
 			a.showHelp = false
 			return a, nil
 		}
@@ -117,18 +98,18 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Login succeeded.
 	case LoginDoneMsg:
 		a.loading = false
-		a.active = screenFilter
-		return a, a.filterScreen.Init()
+		a.screen = NewFilterScreen(a.cfg)
+		return a, a.screen.Init()
 
-	// Login failed.
+	// Login failed — delegate to the login screen so it can display the error.
 	case loginErrMsg:
 		a.loading = false
-		a.loginScreen = a.loginScreen.SetError(msg.err.Error())
-		return a, nil
+		model, cmd := a.screen.Update(msg)
+		a.screen = model
+		return a, cmd
 
 	// Search was triggered from FilterScreen.
 	case SearchStartedMsg:
-		a.active = screenResults
 		a.loading = true
 		a.loadingFilter = msg.Filter
 		return a, tea.Batch(a.doSearch(msg.Filter), a.spinner.Tick)
@@ -136,10 +117,9 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Parallel search completed.
 	case SearchDoneMsg:
 		a.loading = false
-		a.result = msg.Result
-		a.selectedIdx = 0
-		a.resultsScreen = NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
-		a.active = screenResults
+		a.lastResult = msg.Result
+		a.lastFilter = msg.Filter
+		a.screen = NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
 		return a, nil
 
 	// Spinner tick while loading.
@@ -150,12 +130,11 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// User wants to refine the search.
 	case BackToFilterMsg:
-		a.active = screenFilter
+		a.screen = NewFilterScreen(a.cfg)
 		return a, nil
 
 	// User wants to re-run the same search.
 	case RefreshMsg:
-		a.active = screenResults
 		a.loading = true
 		a.loadingFilter = msg.Filter
 		return a, tea.Batch(a.doSearch(msg.Filter), a.spinner.Tick)
@@ -163,13 +142,12 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// User selected a log entry.
 	case OpenDetailMsg:
 		kibanaBase := a.cfg.KibanaURL(msg.Entry.DataCenter, msg.Entry.Environment)
-		a.detailScreen = NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
-		a.active = screenDetail
+		a.screen = NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
 		return a, nil
 
 	// User navigates back from detail to results.
 	case BackToResultsMsg:
-		a.active = screenResults
+		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.width, a.height)
 		return a, nil
 	}
 
@@ -178,51 +156,23 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate to the active screen.
-	switch a.active {
-	case screenLogin:
-		var cmd tea.Cmd
-		a.loginScreen, cmd = a.loginScreen.Update(msg)
-		return a, cmd
-	case screenFilter:
-		var cmd tea.Cmd
-		a.filterScreen, cmd = a.filterScreen.Update(msg)
-		return a, cmd
-	case screenResults:
-		var cmd tea.Cmd
-		a.resultsScreen, cmd = a.resultsScreen.Update(msg)
-		return a, cmd
-	case screenDetail:
-		var cmd tea.Cmd
-		a.detailScreen, cmd = a.detailScreen.Update(msg)
-		return a, cmd
-	}
-
-	return a, nil
+	model, cmd := a.screen.Update(msg)
+	a.screen = model
+	return a, cmd
 }
 
-// View renders the active screen or the help overlay.
+// View renders the active screen or the help/loading overlay.
 func (a App) View() string {
 	if a.showHelp {
 		return helpView(a.width, a.height)
 	}
-	switch a.active {
-	case screenLogin:
-		if a.loading {
-			return a.loginScreen.View() + "\n\n  " + a.spinner.View() + " Authenticating…"
+	if a.loading {
+		if _, isLogin := a.screen.(LoginScreen); isLogin {
+			return a.screen.View() + "\n\n  " + a.spinner.View() + " Authenticating…"
 		}
-		return a.loginScreen.View()
-	case screenFilter:
-		return a.filterScreen.View()
-	case screenResults:
-		if a.loading {
-			return a.loadingView()
-		}
-		return a.resultsScreen.View()
-	case screenDetail:
-		return a.detailScreen.View()
-	default:
-		return ""
+		return a.loadingView()
 	}
+	return a.screen.View()
 }
 
 var (
