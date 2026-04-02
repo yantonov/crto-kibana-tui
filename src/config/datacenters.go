@@ -33,6 +33,11 @@ func defaultDCFilePath(configPath string) string {
 func loadOrFetchAllDatacenters(dcPath string) (map[string][]string, error) {
 	envs, err := loadDCFile(dcPath)
 	if err == nil {
+		for env, dcs := range envs {
+			if len(dcs) == 0 {
+				return nil, fmt.Errorf("no datacenters for %q in %s — edit or delete this file to restore from control plane", env, dcPath)
+			}
+		}
 		return envs, nil
 	}
 	if !os.IsNotExist(err) {

@@ -83,12 +83,6 @@ func Load(path string) (*Config, error) {
 		cfg.environments[env] = EnvironmentConfig{DataCenters: dcs}
 	}
 
-	for _, env := range []string{"prod", "preprod"} {
-		if len(cfg.environments[env].DataCenters) == 0 {
-			return nil, fmt.Errorf("no datacenters configured for %q — check %s", env, defaultDCFilePath(path))
-		}
-	}
-
 	return &cfg, nil
 }
 
