@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -60,7 +61,6 @@ func NewLoginScreen() LoginScreen {
 	userIn.Placeholder = "username"
 	userIn.CharLimit = 128
 	userIn.Width = 38
-	userIn.Focus()
 
 	passIn := textinput.New()
 	passIn.Placeholder = "password"
@@ -69,7 +69,18 @@ func NewLoginScreen() LoginScreen {
 	passIn.EchoMode = textinput.EchoPassword
 	passIn.EchoCharacter = '•'
 
+	focusIdx := loginFieldUsername
+	envUser := os.Getenv("USER")
+	if envUser != "" {
+		userIn.SetValue(envUser)
+		focusIdx = loginFieldPassword
+		passIn.Focus()
+	} else {
+		userIn.Focus()
+	}
+
 	return LoginScreen{
+		focusIdx:      focusIdx,
 		usernameInput: userIn,
 		passwordInput: passIn,
 	}
