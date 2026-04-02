@@ -33,12 +33,6 @@ const IndexPattern = "kestrel-*"
 // QueryTimeoutSeconds is the per-datacenter search timeout.
 const QueryTimeoutSeconds = 10
 
-// Environments defines available environments and their data centers.
-var Environments = map[string]EnvironmentConfig{
-	"prod": {DataCenters: []string{"da1", "us5", "fr3", "fr4", "nl3", "jp2", "sg1"}},
-	"preprod": {DataCenters: []string{"da1", "fr4"}},
-}
-
 // Timeframes defines the selectable time range options.
 var Timeframes = []TimeframeOption{
 	{Label: "15 minutes", Value: "15m"},
@@ -80,12 +74,27 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("decode config: %w", err)
 	}
 
+	envDCs, err := loadOrFetchAllDatacenters(defaultDCFilePath(path))
+	if err != nil {
+		return nil, fmt.Errorf("load datacenters: %w", err)
+	}
+	cfg.environments = make(map[string]EnvironmentConfig, len(envDCs))
+	for env, dcs := range envDCs {
+		cfg.environments[env] = EnvironmentConfig{DataCenters: dcs}
+	}
+
+	for _, env := range []string{"prod", "preprod"} {
+		if len(cfg.environments[env].DataCenters) == 0 {
+			return nil, fmt.Errorf("no datacenters configured for %q — check %s", env, defaultDCFilePath(path))
+		}
+	}
+
 	return &cfg, nil
 }
 
 // DataCenters returns the list of data centers for the given environment.
 func (c *Config) DataCenters(env string) ([]string, error) {
-	e, ok := Environments[env]
+	e, ok := c.environments[env]
 	if !ok {
 		return nil, fmt.Errorf("unknown environment %q", env)
 	}
@@ -104,7 +113,7 @@ func (c *Config) Timeframes() []TimeframeOption {
 
 // Environments returns the environment-to-datacenter mapping.
 func (c *Config) Environments() map[string]EnvironmentConfig {
-	return Environments
+	return c.environments
 }
 
 // IndexPattern returns the OpenSearch index pattern to query.
