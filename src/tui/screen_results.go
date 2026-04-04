@@ -271,6 +271,7 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	case "/":
 		rs.filtering = true
 		rs.filterInput.Focus()
+		rs.tbl = rs.buildTable(rs.visibleEntries())
 		return rs, textinput.Blink
 	}
 
@@ -284,6 +285,7 @@ func (rs ResultsScreen) handleFilterKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd)
 	case "enter", "esc":
 		rs.filtering = false
 		rs.filterInput.Blur()
+		rs.tbl = rs.buildTable(rs.visibleEntries())
 		return rs, nil
 	}
 
@@ -326,13 +328,16 @@ func (rs ResultsScreen) filterPanelLines() int {
 }
 
 func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
-	// 1-line summary bar (or full filter panel) + status bar + table header + spare
+	// filter summary (1) + table header with border (2) + status bar (1) = 4 base overhead.
+	// WithStyles must be applied before WithHeight so viewport.Height is calculated
+	// using the actual header height (2 lines with BorderBottom), keeping the table
+	// strictly shorter than the terminal and the filter summary / status bar always visible.
 	overhead := 4
 	if rs.filterFocused {
 		overhead = rs.filterPanelLines() + 2
 	}
 	if rs.filtering {
-		overhead++
+		overhead += 3 // 3-line rounded-border input box
 	}
 	tableHeight := rs.height - overhead
 	if tableHeight < 3 {
@@ -385,8 +390,8 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 		table.WithColumns(cols),
 		table.WithRows(rows),
 		table.WithFocused(!rs.filterFocused),
-		table.WithHeight(tableHeight),
 		table.WithStyles(s),
+		table.WithHeight(tableHeight), // must come after WithStyles so viewport.Height uses actual header height
 	)
 	return t
 }
@@ -415,12 +420,16 @@ func (rs ResultsScreen) statusBar() string {
 		right = "↑↓/jk navigate · enter detail · / filter · tab edit filters · ctrl+r refresh · e export · c copy · ctrl+c quit"
 	}
 
-	content := lipgloss.JoinHorizontal(lipgloss.Left,
-		dcSection+"  ",
-		count+"    ",
-		right,
-	)
-	return resultsStatusBar.Width(rs.width).Render(content)
+	left := dcSection + "  " + count + "    "
+	leftWidth := lipgloss.Width(left)
+	hPad := 2 // Padding(0, 1) = 1 left + 1 right
+	rightMax := rs.width - hPad - leftWidth
+	if rightMax > 0 && lipgloss.Width(right) > rightMax {
+		right = truncate(right, rightMax)
+	} else if rightMax <= 0 {
+		right = ""
+	}
+	return resultsStatusBar.Width(rs.width).Render(left + right)
 }
 
 func (rs ResultsScreen) filterSummary() string {
