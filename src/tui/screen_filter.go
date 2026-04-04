@@ -29,11 +29,6 @@ const (
 // customAppSentinel is the Option.Value used to signal "user will type a name".
 const customAppSentinel = "__custom__"
 
-// maxAppNameLen is the maximum allowed application name length.
-// OpenSearch field length is capped at the length of the longest known app name:
-// "cbsbluecatalog-retailmedia-inventory-catalogexpo".
-const maxAppNameLen = len("cbsbluecatalog-retailmedia-inventory-catalogexpo")
-
 // inputWidth matches the inner content width of the dropdown component.
 const inputWidth = 50
 
@@ -63,11 +58,10 @@ var (
 			Width(inputWidth + 2)
 )
 
-// FilterScreen is the initial search-parameter form.
+// FilterScreen is both the initial standalone search-parameter form (shown after
+// login) and the embedded filter panel used inside ResultsScreen.
 type FilterScreen struct {
 	cfg      config.Provider
-	width    int
-	height   int
 	focusIdx int
 
 	envDD          components.Dropdown
@@ -146,61 +140,47 @@ func NewFilterScreen(cfg config.Provider) FilterScreen {
 	return fs
 }
 
-// Init satisfies the screen interface.
+// NewFilterScreenFromFilter creates a FilterScreen pre-populated with values from f.
+func NewFilterScreenFromFilter(cfg config.Provider, f models.Filter) FilterScreen {
+	fs := NewFilterScreen(cfg)
+	fs.envDD.SetByValue(f.Environment)
+	if f.Severity < 0 {
+		fs.severityDD.SetByValue("") // "all"
+	} else {
+		fs.severityDD.SetByValue(strconv.Itoa(f.Severity))
+	}
+	if f.Application != "" {
+		fs.appDD.SetByValue(f.Application)
+		if fs.appDD.Selected().Value != f.Application {
+			// not found in known apps → use custom
+			fs.appDD.SetByValue(customAppSentinel)
+			fs.appCustomInput.SetValue(f.Application)
+		}
+	}
+	fs.timeframeDD.SetByValue(f.Timeframe)
+	fs.traceInput.SetValue(f.TraceID)
+	fs.queryInput.SetValue(f.Query)
+	return fs
+}
+
+// ── standalone screen interface ───────────────────────────────────────────────
+
+// Init satisfies the Screen interface.
 func (f FilterScreen) Init() tea.Cmd {
 	return textinput.Blink
 }
 
-// Update handles all messages for the filter screen.
+// Update satisfies the Screen interface when used as a standalone screen.
+// When embedded inside ResultsScreen, UpdateEmbedded is used instead.
 func (f FilterScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if ws, ok := msg.(tea.WindowSizeMsg); ok {
-		f.width = ws.Width
-		f.height = ws.Height
-		return f, nil
-	}
-
-	key, isKey := msg.(tea.KeyMsg)
-
-	if !isKey {
-		// Forward to the active textinput for cursor-blink ticks etc.
-		updated, cmd := f.updateActiveInput(msg)
-		return updated, cmd
-	}
-
-	// Global shortcut — trigger search.
-	if key.String() == "ctrl+s" {
-		return f, f.triggerSearch()
-	}
-
-	// Tab / Shift+Tab always cycle focus (collapsing any open dropdown first).
-	switch key.String() {
-	case "tab":
-		f.collapseActiveDrop()
-		f.focusIdx = f.nextField()
-		f.syncFocus()
-		return f, nil
-	case "shift+tab":
-		f.collapseActiveDrop()
-		f.focusIdx = f.prevField()
-		f.syncFocus()
-		return f, nil
-	}
-
-	// When the app dropdown changes selection away from custom, leave fieldAppCustom.
-	if f.focusIdx == fieldAppCustom && !f.isCustomApp() {
-		f.focusIdx = fieldApp
-		f.syncFocus()
-	}
-
-	// Route the key to the active field.
-	updated, cmd := f.routeKey(key)
-	return updated, cmd
+	fs, cmd := f.update(msg)
+	return fs, cmd
 }
 
-// View renders the filter form.
+// View renders the full standalone filter form (title + fields + help line).
 func (f FilterScreen) View() string {
 	appField := f.appDD.View()
-	if f.appDD.Selected().Value == customAppSentinel {
+	if f.isCustomApp() {
 		appField = lipgloss.JoinVertical(lipgloss.Left,
 			appField,
 			f.wrapInput(f.appCustomInput, f.focusIdx == fieldAppCustom),
@@ -229,7 +209,95 @@ func (f FilterScreen) View() string {
 	)
 }
 
-// ── helpers ──────────────────────────────────────────────────────────────────
+// ── embedded panel interface ──────────────────────────────────────────────────
+
+// UpdateEmbedded handles key and tick messages routed from ResultsScreen.
+func (f FilterScreen) UpdateEmbedded(msg tea.Msg) (FilterScreen, tea.Cmd) {
+	return f.update(msg)
+}
+
+// ViewEmbedded renders the filter fields without title, help or outer padding.
+func (f FilterScreen) ViewEmbedded() string {
+	appField := f.appDD.View()
+	if f.isCustomApp() {
+		appField = lipgloss.JoinVertical(lipgloss.Left,
+			appField,
+			f.wrapInput(f.appCustomInput, f.focusIdx == fieldAppCustom),
+		)
+	}
+	rows := []string{
+		f.row("Environment", f.envDD.View()),
+		f.row("Severity", f.severityDD.View()),
+		f.row("Application", appField),
+		f.row("Timeframe", f.timeframeDD.View()),
+		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
+		f.row("Query", f.wrapInput(f.queryInput, f.focusIdx == fieldQuery)),
+	}
+	return strings.Join(rows, "\n")
+}
+
+// ── focus helpers ─────────────────────────────────────────────────────────────
+
+// AtFirstField reports whether focus is on the first reachable field.
+func (f FilterScreen) AtFirstField() bool { return f.focusIdx == fieldEnv }
+
+// AtLastField reports whether focus is on the last reachable field.
+func (f FilterScreen) AtLastField() bool { return f.focusIdx == fieldQuery }
+
+// FocusFirst moves focus to the first field.
+func (f *FilterScreen) FocusFirst() { f.focusIdx = fieldEnv; f.syncFocus() }
+
+// FocusLast moves focus to the last field.
+func (f *FilterScreen) FocusLast() { f.focusIdx = fieldQuery; f.syncFocus() }
+
+// FocusNone blurs all fields (used when the results table takes focus).
+func (f *FilterScreen) FocusNone() { f.focusIdx = -1; f.syncFocus() }
+
+// IsAnyDropdownExpanded reports whether any dropdown is currently open.
+func (f FilterScreen) IsAnyDropdownExpanded() bool {
+	return f.envDD.IsExpanded() || f.severityDD.IsExpanded() ||
+		f.appDD.IsExpanded() || f.timeframeDD.IsExpanded()
+}
+
+// ── shared update logic ───────────────────────────────────────────────────────
+
+func (f FilterScreen) update(msg tea.Msg) (FilterScreen, tea.Cmd) {
+	if _, ok := msg.(tea.WindowSizeMsg); ok {
+		return f, nil
+	}
+
+	key, isKey := msg.(tea.KeyMsg)
+
+	if !isKey {
+		return f.updateActiveInput(msg)
+	}
+
+	if key.String() == "ctrl+s" {
+		return f, f.triggerSearch()
+	}
+
+	switch key.String() {
+	case "tab":
+		f.collapseActiveDrop()
+		f.focusIdx = f.nextField()
+		f.syncFocus()
+		return f, nil
+	case "shift+tab":
+		f.collapseActiveDrop()
+		f.focusIdx = f.prevField()
+		f.syncFocus()
+		return f, nil
+	}
+
+	if f.focusIdx == fieldAppCustom && !f.isCustomApp() {
+		f.focusIdx = fieldApp
+		f.syncFocus()
+	}
+
+	return f.routeKey(key)
+}
+
+// ── private helpers ───────────────────────────────────────────────────────────
 
 func (f *FilterScreen) syncFocus() {
 	f.envDD.SetFocused(f.focusIdx == fieldEnv)
@@ -254,7 +322,7 @@ func (f *FilterScreen) syncFocus() {
 	}
 }
 
-func (f *FilterScreen) isCustomApp() bool {
+func (f FilterScreen) isCustomApp() bool {
 	return f.appDD.Selected().Value == customAppSentinel
 }
 
@@ -341,10 +409,6 @@ func (f FilterScreen) triggerSearch() tea.Cmd {
 	app := f.appDD.Selected().Value
 	if app == customAppSentinel {
 		app = strings.TrimSpace(f.appCustomInput.Value())
-	}
-	app = strings.ReplaceAll(app, "/", "-")
-	if runes := []rune(app); len(runes) > maxAppNameLen {
-		app = string(runes[:maxAppNameLen])
 	}
 	filter := models.Filter{
 		Environment: f.envDD.Selected().Value,

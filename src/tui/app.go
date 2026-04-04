@@ -80,9 +80,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				a.showHelp = false
 				return a, nil
 			}
-			if _, isFilter := a.screen.(FilterScreen); isFilter {
-				return a, tea.Quit
-			}
 		}
 		if a.showHelp {
 			// Any other key closes the help overlay.
@@ -95,10 +92,10 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.loading = true
 		return a, tea.Batch(a.doLogin(msg.Username, msg.Password), a.spinner.Tick)
 
-	// Login succeeded.
+	// Login succeeded — show the results page with the filter panel ready for input.
 	case LoginDoneMsg:
 		a.loading = false
-		a.screen = NewFilterScreen(a.cfg)
+		a.screen = NewInitialResultsScreen(a.cfg, a.width, a.height)
 		return a, a.screen.Init()
 
 	// Login failed — delegate to the login screen so it can display the error.
@@ -108,7 +105,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.screen = model
 		return a, cmd
 
-	// Search was triggered from FilterScreen.
 	case SearchStartedMsg:
 		a.loading = true
 		a.loadingFilter = msg.Filter
@@ -119,7 +115,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.loading = false
 		a.lastResult = msg.Result
 		a.lastFilter = msg.Filter
-		a.screen = NewResultsScreen(msg.Result, msg.Filter, a.width, a.height)
+		a.screen = NewResultsScreen(msg.Result, msg.Filter, a.cfg, a.width, a.height)
 		return a, nil
 
 	// Spinner tick while loading.
@@ -127,11 +123,6 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		a.spinner, cmd = a.spinner.Update(msg)
 		return a, cmd
-
-	// User wants to refine the search.
-	case BackToFilterMsg:
-		a.screen = NewFilterScreen(a.cfg)
-		return a, nil
 
 	// User wants to re-run the same search.
 	case RefreshMsg:
@@ -147,7 +138,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// User navigates back from detail to results.
 	case BackToResultsMsg:
-		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.width, a.height)
+		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.cfg, a.width, a.height)
 		return a, nil
 	}
 
@@ -266,20 +257,19 @@ func helpView(width, height int) string {
 	lines := []string{
 		helpTitleStyle.Render("klt — Key Bindings"),
 		"",
-		helpSectionStyle.Render("Filter Screen"),
-		"  ctrl+s        search",
-		"  tab            next field",
-		"  shift+tab     prev field",
-		"  enter          confirm dropdown",
-		"  esc             quit",
+		helpSectionStyle.Render("Filter Panel"),
+		"  ctrl+s          search",
+		"  tab              next field  (exits to table at last field)",
+		"  shift+tab       prev field  (exits to table at first field)",
+		"  enter / space  open dropdown",
+		"  esc             focus results table",
 		"",
-		helpSectionStyle.Render("Results Screen"),
+		helpSectionStyle.Render("Results Table"),
 		"  ↑/↓  j/k       navigate rows",
 		"  enter           open detail",
-		"  r                back to filter",
+		"  tab / shift+tab  focus filter panel",
 		"  ctrl+r          refresh (re-run search)",
-		"  /                inline filter",
-		"  esc             back to filter",
+		"  /                inline text filter",
 		"  e                export to NDJSON file",
 		"  c                copy selected row JSON",
 		"",

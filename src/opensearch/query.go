@@ -15,6 +15,20 @@ const (
 	fieldMessage     = "message"
 )
 
+// maxAppNameLen is the maximum byte length accepted by the OpenSearch term field.
+// Capped at the length of the longest known application name.
+const maxAppNameLen = len("cbsbluecatalog-retailmedia-inventory-catalogexpo")
+
+// normalizeAppName prepares an application name for use as an OpenSearch term:
+// slashes are replaced with dashes and the name is truncated to maxAppNameLen runes.
+func normalizeAppName(name string) string {
+	name = strings.ReplaceAll(name, "/", "-")
+	if runes := []rune(name); len(runes) > maxAppNameLen {
+		name = string(runes[:maxAppNameLen])
+	}
+	return name
+}
+
 // timeframeDSL converts a timeframe string (e.g. "1h", "2d") to an OpenSearch range gte value.
 func timeframeDSL(tf string) string {
 	switch tf {
@@ -44,8 +58,9 @@ func buildQuery(f models.Filter, size int) searchRequest {
 		})
 	}
 	if f.Application != "" {
+		app := normalizeAppName(f.Application)
 		filters = append(filters, queryClause{
-			"term": queryClause{fieldApplication: f.Application},
+			"term": queryClause{fieldApplication: app},
 		})
 	}
 	if f.TraceID != "" {

@@ -15,9 +15,6 @@ type SearchStartedMsg struct {
 	Filter models.Filter
 }
 
-// BackToFilterMsg is sent when the user wants to refine the search.
-type BackToFilterMsg struct{}
-
 // RefreshMsg is sent when the user wants to re-run the same search.
 type RefreshMsg struct {
 	Filter models.Filter

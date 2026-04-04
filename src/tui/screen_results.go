@@ -10,11 +10,18 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/criteo/klt/src/config"
 	"github.com/criteo/klt/src/export"
 	"github.com/criteo/klt/src/models"
 )
 
 var (
+	filterPanelFocusedStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#1F2937")).
+				Foreground(lipgloss.Color("#C4B5FD")).
+				Bold(true).
+				Padding(0, 1)
+
 	resultsStatusBar = lipgloss.NewStyle().
 				Background(lipgloss.Color("#1F2937")).
 				Foreground(lipgloss.Color("#F9FAFB")).
@@ -28,17 +35,17 @@ var (
 				BorderForeground(lipgloss.Color("#7C3AED")).
 				PaddingLeft(1).PaddingRight(1)
 
-	resultsFilterBar = lipgloss.NewStyle().
-			Background(lipgloss.Color("#111827")).
-			Foreground(lipgloss.Color("#9CA3AF")).
-			Padding(0, 1)
+	filterSummaryStyle = lipgloss.NewStyle().
+				Background(lipgloss.Color("#111827")).
+				Foreground(lipgloss.Color("#9CA3AF")).
+				Padding(0, 1)
 
-	resultsFilterHighlight = lipgloss.NewStyle().
+	filterSummaryHighlight = lipgloss.NewStyle().
 				Background(lipgloss.Color("#111827")).
 				Foreground(lipgloss.Color("#C4B5FD"))
 )
 
-// ResultsScreen displays the merged search results in a table.
+// ResultsScreen displays the filter panel and merged search results together.
 type ResultsScreen struct {
 	result  models.CombinedResult
 	filter  models.Filter
@@ -51,12 +58,39 @@ type ResultsScreen struct {
 	filtered    []models.LogEntry // currently visible subset (nil = show all)
 	notice      string            // transient feedback shown in the status bar
 
+	cfg           config.Provider
+	filterPanel   FilterScreen
+	filterFocused bool // true when the filter panel has keyboard focus
+
 	width  int
 	height int
 }
 
+// NewInitialResultsScreen constructs the screen shown immediately after login:
+// the filter panel is focused and ready for input; the results table is empty.
+func NewInitialResultsScreen(cfg config.Provider, width, height int) ResultsScreen {
+	fi := textinput.New()
+	fi.Placeholder = "filter..."
+	fi.CharLimit = 128
+
+	fp := NewFilterScreen(cfg)
+	fp.FocusFirst()
+
+	rs := ResultsScreen{
+		filterInput:   fi,
+		cfg:           cfg,
+		filterPanel:   fp,
+		filterFocused: true,
+		width:         width,
+		height:        height,
+		ready:         true,
+	}
+	rs.tbl = rs.buildTable(nil)
+	return rs
+}
+
 // NewResultsScreen constructs a ResultsScreen from the combined search result.
-func NewResultsScreen(result models.CombinedResult, filter models.Filter, width, height int) ResultsScreen {
+func NewResultsScreen(result models.CombinedResult, filter models.Filter, cfg config.Provider, width, height int) ResultsScreen {
 	dcSet := make(map[string]struct{})
 	for _, e := range result.Entries {
 		dcSet[e.DataCenter] = struct{}{}
@@ -79,6 +113,8 @@ func NewResultsScreen(result models.CombinedResult, filter models.Filter, width,
 		filter:      filter,
 		allDCs:      allDCs,
 		filterInput: fi,
+		cfg:         cfg,
+		filterPanel: NewFilterScreenFromFilter(cfg, filter),
 		width:       width,
 		height:      height,
 		ready:       true,
@@ -87,8 +123,8 @@ func NewResultsScreen(result models.CombinedResult, filter models.Filter, width,
 	return rs
 }
 
-// Init satisfies the screen interface.
-func (rs ResultsScreen) Init() tea.Cmd { return nil }
+// Init satisfies the screen interface; starts cursor blinking in text inputs.
+func (rs ResultsScreen) Init() tea.Cmd { return textinput.Blink }
 
 // Update handles all messages for the results screen.
 func (rs ResultsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -100,17 +136,27 @@ func (rs ResultsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return rs, nil
 
 	case tea.KeyMsg:
-		if rs.filtering {
-			updated, cmd := rs.handleFilterKey(msg)
-			return updated, cmd
+		if rs.filterFocused {
+			return rs.handleFilterPanelKey(msg)
 		}
-		updated, cmd := rs.handleKey(msg)
-		return updated, cmd
+		if rs.filtering {
+			return rs.handleFilterKey(msg)
+		}
+		return rs.handleKey(msg)
+
+	default:
+		if rs.filterFocused {
+			// Forward non-key messages (e.g. cursor blink ticks) to the filter panel.
+			var cmd tea.Cmd
+			rs.filterPanel, cmd = rs.filterPanel.UpdateEmbedded(msg)
+			return rs, cmd
+		}
 	}
 	return rs, nil
 }
 
-// View renders the results table and status bar.
+// View renders the results screen: expanded filter panel or compact summary,
+// followed by the results table and status bar.
 func (rs ResultsScreen) View() string {
 	if !rs.ready {
 		return "  Searching…"
@@ -118,7 +164,11 @@ func (rs ResultsScreen) View() string {
 
 	var parts []string
 
-	parts = append(parts, rs.filterSummary())
+	if rs.filterFocused {
+		parts = append(parts, rs.filterPanelView())
+	} else {
+		parts = append(parts, rs.filterSummary())
+	}
 	if rs.filtering {
 		parts = append(parts, "  / "+resultsFilterInput.Render(rs.filterInput.View()))
 	}
@@ -128,18 +178,65 @@ func (rs ResultsScreen) View() string {
 	return strings.Join(parts, "\n")
 }
 
+func (rs ResultsScreen) filterPanelView() string {
+	header := filterPanelFocusedStyle.Width(rs.width).Render(
+		"Filter   ctrl+s search · tab/shift+tab navigate · esc close",
+	)
+	return header + "\n" + rs.filterPanel.ViewEmbedded()
+}
+
 // ── key handling ─────────────────────────────────────────────────────────────
+
+func (rs ResultsScreen) handleFilterPanelKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
+	switch msg.String() {
+	case "tab":
+		if rs.filterPanel.AtLastField() {
+			rs.filterFocused = false
+			rs.filterPanel.FocusNone()
+			rs.tbl = rs.buildTable(rs.visibleEntries())
+			return rs, nil
+		}
+	case "shift+tab":
+		if rs.filterPanel.AtFirstField() {
+			rs.filterFocused = false
+			rs.filterPanel.FocusNone()
+			rs.tbl = rs.buildTable(rs.visibleEntries())
+			return rs, nil
+		}
+	case "esc":
+		if !rs.filterPanel.IsAnyDropdownExpanded() {
+			rs.filterFocused = false
+			rs.filterPanel.FocusNone()
+			rs.tbl = rs.buildTable(rs.visibleEntries())
+			return rs, nil
+		}
+	}
+	var cmd tea.Cmd
+	rs.filterPanel, cmd = rs.filterPanel.UpdateEmbedded(msg)
+	return rs, cmd
+}
 
 func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	rs.notice = "" // clear previous notice on any keypress
 
 	switch msg.String() {
+	case "tab":
+		rs.filterPanel = NewFilterScreenFromFilter(rs.cfg, rs.filter)
+		rs.filterPanel.FocusFirst()
+		rs.filterFocused = true
+		rs.tbl = rs.buildTable(rs.visibleEntries())
+		return rs, textinput.Blink
+
+	case "shift+tab":
+		rs.filterPanel = NewFilterScreenFromFilter(rs.cfg, rs.filter)
+		rs.filterPanel.FocusLast()
+		rs.filterFocused = true
+		rs.tbl = rs.buildTable(rs.visibleEntries())
+		return rs, textinput.Blink
+
 	case "ctrl+r":
 		f := rs.filter
 		return rs, func() tea.Msg { return RefreshMsg{Filter: f} }
-
-	case "r":
-		return rs, func() tea.Msg { return BackToFilterMsg{} }
 
 	case "enter":
 		entries := rs.visibleEntries()
@@ -175,9 +272,6 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 		rs.filtering = true
 		rs.filterInput.Focus()
 		return rs, textinput.Blink
-
-	case "esc":
-		return rs, func() tea.Msg { return BackToFilterMsg{} }
 	}
 
 	var cmd tea.Cmd
@@ -222,9 +316,25 @@ func (rs ResultsScreen) visibleEntries() []models.LogEntry {
 	return rs.result.Entries
 }
 
+func (rs ResultsScreen) filterPanelLines() int {
+	// header (1) + 6 field rows × 3 lines each + 5 newline separators between rows
+	n := 1 + 6*3 + 5
+	if rs.filterPanel.isCustomApp() {
+		n += 3 + 1 // appCustomInput field (3 lines) + 1 separator newline
+	}
+	return n
+}
+
 func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
-	// Leave room for filter summary (1), status bar (1), optional filter input (1), plus table header.
-	tableHeight := rs.height - 4
+	// 1-line summary bar (or full filter panel) + status bar + table header + spare
+	overhead := 4
+	if rs.filterFocused {
+		overhead = rs.filterPanelLines() + 2
+	}
+	if rs.filtering {
+		overhead++
+	}
+	tableHeight := rs.height - overhead
 	if tableHeight < 3 {
 		tableHeight = 3
 	}
@@ -274,7 +384,7 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 	t := table.New(
 		table.WithColumns(cols),
 		table.WithRows(rows),
-		table.WithFocused(true),
+		table.WithFocused(!rs.filterFocused),
 		table.WithHeight(tableHeight),
 		table.WithStyles(s),
 	)
@@ -302,7 +412,7 @@ func (rs ResultsScreen) statusBar() string {
 	if rs.notice != "" {
 		right = rs.notice
 	} else {
-		right = "↑↓/jk navigate · enter detail · / filter · r refine · ctrl+r refresh · e export · c copy"
+		right = "↑↓/jk navigate · enter detail · / filter · tab edit filters · ctrl+r refresh · e export · c copy · ctrl+c quit"
 	}
 
 	content := lipgloss.JoinHorizontal(lipgloss.Left,
@@ -315,13 +425,12 @@ func (rs ResultsScreen) statusBar() string {
 
 func (rs ResultsScreen) filterSummary() string {
 	f := rs.filter
-	hi := resultsFilterHighlight.Render
+	hi := filterSummaryHighlight.Render
 
 	app := "all"
 	if f.Application != "" {
 		app = f.Application
 	}
-
 	sev := "all"
 	if f.Severity >= 0 {
 		sev = models.SeverityLabel(f.Severity)
@@ -332,7 +441,10 @@ func (rs ResultsScreen) filterSummary() string {
 	if f.TraceID != "" {
 		line += fmt.Sprintf("  trace:%s", hi(f.TraceID))
 	}
-	return resultsFilterBar.Width(rs.width).Render(line)
+	if f.Environment == "" {
+		line = "tab to configure filters · ctrl+s to search"
+	}
+	return filterSummaryStyle.Width(rs.width).Render(line)
 }
 
 func truncate(s string, n int) string {
