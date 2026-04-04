@@ -20,9 +20,9 @@ const (
 	fieldSeverity  = 1
 	fieldApp       = 2
 	fieldAppCustom = 3 // only reachable when "custom..." is selected in appDD
-	fieldTimeframe = 4
+	fieldQuery     = 4
 	fieldTraceID   = 5
-	fieldQuery     = 6
+	fieldTimeframe = 6
 	fieldCount     = 7
 )
 
@@ -191,9 +191,9 @@ func (f FilterScreen) View() string {
 		f.row("Environment", f.envDD.View()),
 		f.row("Severity", f.severityDD.View()),
 		f.row("Application", appField),
-		f.row("Timeframe", f.timeframeDD.View()),
-		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
 		f.row("Query", f.wrapInput(f.queryInput, f.focusIdx == fieldQuery)),
+		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
+		f.row("Timeframe", f.timeframeDD.View()),
 	}
 
 	help := helpStyle.Render("ctrl+s search  ·  tab next  ·  shift+tab prev  ·  ctrl+c quit")
@@ -229,9 +229,9 @@ func (f FilterScreen) ViewEmbedded() string {
 		f.row("Environment", f.envDD.View()),
 		f.row("Severity", f.severityDD.View()),
 		f.row("Application", appField),
-		f.row("Timeframe", f.timeframeDD.View()),
-		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
 		f.row("Query", f.wrapInput(f.queryInput, f.focusIdx == fieldQuery)),
+		f.row("Trace ID", f.wrapInput(f.traceInput, f.focusIdx == fieldTraceID)),
+		f.row("Timeframe", f.timeframeDD.View()),
 	}
 	return strings.Join(rows, "\n")
 }
@@ -242,13 +242,13 @@ func (f FilterScreen) ViewEmbedded() string {
 func (f FilterScreen) AtFirstField() bool { return f.focusIdx == fieldEnv }
 
 // AtLastField reports whether focus is on the last reachable field.
-func (f FilterScreen) AtLastField() bool { return f.focusIdx == fieldQuery }
+func (f FilterScreen) AtLastField() bool { return f.focusIdx == fieldTimeframe }
 
 // FocusFirst moves focus to the first field.
 func (f *FilterScreen) FocusFirst() { f.focusIdx = fieldEnv; f.syncFocus() }
 
 // FocusLast moves focus to the last field.
-func (f *FilterScreen) FocusLast() { f.focusIdx = fieldQuery; f.syncFocus() }
+func (f *FilterScreen) FocusLast() { f.focusIdx = fieldTimeframe; f.syncFocus() }
 
 // FocusNone blurs all fields (used when the results table takes focus).
 func (f *FilterScreen) FocusNone() { f.focusIdx = -1; f.syncFocus() }

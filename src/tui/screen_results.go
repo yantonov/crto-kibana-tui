@@ -436,11 +436,15 @@ func (rs ResultsScreen) filterSummary() string {
 		sev = models.SeverityLabel(f.Severity)
 	}
 
-	line := fmt.Sprintf("env:%s  app:%s  severity:%s  timeframe:%s",
-		hi(f.Environment), hi(app), hi(sev), hi(f.Timeframe))
+	line := fmt.Sprintf("env:%s  severity:%s  app:%s",
+		hi(f.Environment), hi(sev), hi(app))
+	if f.Query != "" {
+		line += fmt.Sprintf("  query:%s", hi(f.Query))
+	}
 	if f.TraceID != "" {
 		line += fmt.Sprintf("  trace:%s", hi(f.TraceID))
 	}
+	line += fmt.Sprintf("  timeframe:%s", hi(f.Timeframe))
 	if f.Environment == "" {
 		line = "tab to configure filters · ctrl+s to search"
 	}

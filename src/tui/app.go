@@ -190,11 +190,15 @@ func (a App) loadingView() string {
 		sev = models.SeverityLabel(f.Severity)
 	}
 
-	summary := fmt.Sprintf("env:%s  app:%s  severity:%s  timeframe:%s",
-		hi(f.Environment), hi(app), hi(sev), hi(f.Timeframe))
+	summary := fmt.Sprintf("env:%s  severity:%s  app:%s",
+		hi(f.Environment), hi(sev), hi(app))
+	if f.Query != "" {
+		summary += fmt.Sprintf("  query:%s", hi(f.Query))
+	}
 	if f.TraceID != "" {
 		summary += fmt.Sprintf("  trace:%s", hi(f.TraceID))
 	}
+	summary += fmt.Sprintf("  timeframe:%s", hi(f.Timeframe))
 
 	bar := loadingBarStyle.Width(a.width).Render(summary)
 	msg := "\n  " + a.spinner.View() + " Searching…"
