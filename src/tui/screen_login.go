@@ -132,7 +132,7 @@ func (l LoginScreen) View() string {
 	help := loginHelpStyle.Render("enter  login  ·  tab  next field  ·  ctrl+c  quit")
 
 	parts := []string{
-		loginTitleStyle.Render("klt — Log Viewer"),
+		loginTitleStyle.Render("crtokt — Log Viewer"),
 		"",
 		strings.Join(rows, "\n"),
 		"",

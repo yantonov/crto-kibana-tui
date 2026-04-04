@@ -6,9 +6,9 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/opensearch"
-	"github.com/criteo/klt/src/tui"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/opensearch"
+	"github.com/yantonov/crtokt/src/tui"
 )
 
 func main() {

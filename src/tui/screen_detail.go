@@ -9,8 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/criteo/klt/src/export"
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/export"
+	"github.com/yantonov/crtokt/src/models"
 )
 
 // headerLines is the number of lines consumed by the header, separator, and
@@ -141,7 +141,7 @@ func (ds DetailScreen) headerSection() string {
 		mode = "raw"
 	}
 	lines := []string{
-		detailTitleStyle.Render(fmt.Sprintf("klt — Log Detail  [%s]", mode)),
+		detailTitleStyle.Render(fmt.Sprintf("crtokt — Log Detail  [%s]", mode)),
 		"",
 		metaRow("Timestamp", e.Timestamp.Format("2006-01-02 15:04:05.000 UTC")),
 		metaRow("Severity", e.Severity),

@@ -9,9 +9,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/models"
-	"github.com/criteo/klt/src/tui/components"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/models"
+	"github.com/yantonov/crtokt/src/tui/components"
 )
 
 // field indices — order matches tab navigation.
@@ -200,7 +200,7 @@ func (f FilterScreen) View() string {
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(
 		strings.Join([]string{
-			titleStyle.Render("klt — Log Viewer"),
+			titleStyle.Render("crtokt — Log Viewer"),
 			"",
 			strings.Join(rows, "\n"),
 			"",

@@ -7,13 +7,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/models"
 )
 
 // WriteNDJSON writes the raw JSON of each entry to an NDJSON file (one record
 // per line) and returns the path of the created file.
 func WriteNDJSON(entries []models.LogEntry) (string, error) {
-	path := fmt.Sprintf("klt-export-%s.ndjson", time.Now().Format("20060102-150405"))
+	path := fmt.Sprintf("crtokt-export-%s.ndjson", time.Now().Format("20060102-150405"))
 	f, err := os.Create(path)
 	if err != nil {
 		return "", err

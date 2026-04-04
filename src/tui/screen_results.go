@@ -10,9 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/export"
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/export"
+	"github.com/yantonov/crtokt/src/models"
 )
 
 var (

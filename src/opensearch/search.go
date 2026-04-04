@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/models"
 	"golang.org/x/sync/errgroup"
 )
 

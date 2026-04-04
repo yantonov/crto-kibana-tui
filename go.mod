@@ -1,4 +1,4 @@
-module github.com/criteo/klt
+module github.com/yantonov/crtokt
 
 go 1.25.0
 

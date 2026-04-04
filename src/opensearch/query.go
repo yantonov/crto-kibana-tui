@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/models"
 )
 
 const (

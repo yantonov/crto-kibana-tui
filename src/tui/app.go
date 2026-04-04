@@ -10,9 +10,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/models"
-	"github.com/criteo/klt/src/opensearch"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/models"
+	"github.com/yantonov/crtokt/src/opensearch"
 )
 
 // App is the root Bubble Tea model. It owns the screen-routing state machine
@@ -255,7 +255,7 @@ var (
 
 func helpView(width, height int) string {
 	lines := []string{
-		helpTitleStyle.Render("klt — Key Bindings"),
+		helpTitleStyle.Render("crtokt — Key Bindings"),
 		"",
 		helpSectionStyle.Render("Filter Panel"),
 		"  ctrl+s          search",

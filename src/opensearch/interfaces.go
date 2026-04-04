@@ -3,8 +3,8 @@ package opensearch
 import (
 	"context"
 
-	"github.com/criteo/klt/src/config"
-	"github.com/criteo/klt/src/models"
+	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/models"
 )
 
 // Searcher is the interface the TUI uses to authenticate and run searches.

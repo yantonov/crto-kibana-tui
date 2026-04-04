@@ -1,6 +1,6 @@
 package tui
 
-import "github.com/criteo/klt/src/models"
+import "github.com/yantonov/crtokt/src/models"
 
 // ── messages sent from screens up to App ─────────────────────────────────────
 
