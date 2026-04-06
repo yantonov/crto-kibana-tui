@@ -96,7 +96,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case LoginDoneMsg:
 		a.loading = false
 		a.screen = NewInitialResultsScreen(a.cfg, a.width, a.height)
-		return a, a.screen.Init()
+		return a, tea.Batch(clearScreenCmd(), a.screen.Init())
 
 	// Login failed — delegate to the login screen so it can display the error.
 	case loginErrMsg:
@@ -116,7 +116,7 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		a.lastResult = msg.Result
 		a.lastFilter = msg.Filter
 		a.screen = NewResultsScreen(msg.Result, msg.Filter, a.cfg, a.width, a.height)
-		return a, nil
+		return a, clearScreenCmd()
 
 	// Spinner tick while loading.
 	case spinner.TickMsg:
@@ -134,23 +134,23 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case OpenDetailMsg:
 		kibanaBase := a.cfg.KibanaURL(msg.Entry.DataCenter, msg.Entry.Environment)
 		a.screen = NewDetailScreen(msg.Entry, kibanaBase, a.width, a.height)
-		return a, nil
+		return a, clearScreenCmd()
 
 	// User navigates back from detail to results.
 	case BackToResultsMsg:
 		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.cfg, a.width, a.height)
-		return a, nil
+		return a, clearScreenCmd()
 
 	// User wants to view statistics for the current search result — computed
 	// client-side from the already-fetched entries, so no extra HTTP call.
 	case ShowStatsMsg:
 		a.screen = NewStatsScreen(msg.Result, msg.Filter, a.width, a.height)
-		return a, nil
+		return a, clearScreenCmd()
 
 	// User navigates back from stats to results.
 	case BackFromStatsMsg:
 		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.cfg, a.width, a.height)
-		return a, nil
+		return a, clearScreenCmd()
 	}
 
 	if a.showHelp {
@@ -251,6 +251,12 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 	}
 }
 
+
+// clearScreenCmd returns a tea.Cmd that clears the terminal before the next render,
+// preventing stale content from a previous (taller) screen from bleeding through.
+func clearScreenCmd() tea.Cmd {
+	return func() tea.Msg { return tea.ClearScreen() }
+}
 
 // ── help overlay ──────────────────────────────────────────────────────────────
 
