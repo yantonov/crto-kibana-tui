@@ -61,6 +61,7 @@ type ResultsScreen struct {
 	cfg           config.Provider
 	filterPanel   FilterScreen
 	filterFocused bool // true when the filter panel has keyboard focus
+	showHelp      bool // true when the F1 help popup is visible
 
 	width  int
 	height int
@@ -136,6 +137,10 @@ func (rs ResultsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return rs, nil
 
 	case tea.KeyMsg:
+		if rs.showHelp {
+			rs.showHelp = false
+			return rs, nil
+		}
 		if rs.filterFocused {
 			return rs.handleFilterPanelKey(msg)
 		}
@@ -160,6 +165,9 @@ func (rs ResultsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (rs ResultsScreen) View() string {
 	if !rs.ready {
 		return "  Searching…"
+	}
+	if rs.showHelp {
+		return rs.resultsHelpView()
 	}
 
 	var parts []string
@@ -277,6 +285,10 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	case "ctrl+t":
 		f, r := rs.filter, rs.result
 		return rs, func() tea.Msg { return ShowStatsMsg{Filter: f, Result: r} }
+
+	case "f1":
+		rs.showHelp = true
+		return rs, nil
 	}
 
 	var cmd tea.Cmd
@@ -421,7 +433,7 @@ func (rs ResultsScreen) statusBar() string {
 	if rs.notice != "" {
 		right = rs.notice
 	} else {
-		right = "↑↓/jk navigate · enter detail · / filter · tab edit filters · ctrl+r refresh · e export · c copy · ctrl+t stats · ctrl+c quit"
+		right = "F1 help"
 	}
 
 	left := dcSection + "  " + count + "    "
@@ -462,6 +474,32 @@ func (rs ResultsScreen) filterSummary() string {
 		line = "tab to configure filters · ctrl+s to search"
 	}
 	return filterSummaryStyle.Width(rs.width).Render(line)
+}
+
+func (rs ResultsScreen) resultsHelpView() string {
+	lines := []string{
+		helpTitleStyle.Render("Results — Key Bindings"),
+		"",
+		helpSectionStyle.Render("Navigation"),
+		"  ↑/↓  j/k        navigate rows",
+		"  enter            open detail view",
+		"",
+		helpSectionStyle.Render("Filters"),
+		"  /                inline text filter",
+		"  tab / shift+tab  focus filter panel",
+		"  ctrl+r           refresh (re-run search)",
+		"",
+		helpSectionStyle.Render("Actions"),
+		"  e                export to NDJSON file",
+		"  c                copy selected row JSON",
+		"  ctrl+t           open statistics screen",
+		"",
+		helpSectionStyle.Render("Global"),
+		"  F1               toggle this help",
+		"  ctrl+c           quit",
+	}
+	box := helpBoxStyle.Render(strings.Join(lines, "\n"))
+	return lipgloss.Place(rs.width, rs.height, lipgloss.Center, lipgloss.Center, box)
 }
 
 func truncate(s string, n int) string {

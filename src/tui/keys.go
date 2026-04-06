@@ -58,6 +58,7 @@ type ResultsKeyMap struct {
 	Refine  key.Binding
 	Refresh key.Binding
 	Filter  key.Binding
+	Help    key.Binding
 }
 
 // ResultsKeys is the singleton results key map.
@@ -93,6 +94,10 @@ var ResultsKeys = ResultsKeyMap{
 	Filter: key.NewBinding(
 		key.WithKeys("/"),
 		key.WithHelp("/", "filter"),
+	),
+	Help: key.NewBinding(
+		key.WithKeys("f1"),
+		key.WithHelp("F1", "help"),
 	),
 }
 
