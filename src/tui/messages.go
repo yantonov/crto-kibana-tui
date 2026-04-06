@@ -28,6 +28,17 @@ type OpenDetailMsg struct {
 // BackToResultsMsg is sent when the user presses Esc/b on the detail screen.
 type BackToResultsMsg struct{}
 
+// ShowStatsMsg is sent when the user wants to view statistics for the current
+// search. It carries the already-fetched result so no extra HTTP round-trip
+// is needed.
+type ShowStatsMsg struct {
+	Filter models.Filter
+	Result models.CombinedResult
+}
+
+// BackFromStatsMsg is sent when the user navigates back from the stats screen.
+type BackFromStatsMsg struct{}
+
 // ── messages sent from App to itself ─────────────────────────────────────────
 
 // SearchDoneMsg is sent by the app to itself when all parallel DC searches complete.

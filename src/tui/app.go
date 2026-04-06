@@ -30,7 +30,7 @@ type App struct {
 	loading       bool
 	loadingFilter models.Filter
 
-	// stored so the results screen can be rebuilt when navigating back from detail
+	// stored so the results screen can be rebuilt when navigating back from detail or stats
 	lastResult models.CombinedResult
 	lastFilter models.Filter
 
@@ -140,6 +140,17 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case BackToResultsMsg:
 		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.cfg, a.width, a.height)
 		return a, nil
+
+	// User wants to view statistics for the current search result — computed
+	// client-side from the already-fetched entries, so no extra HTTP call.
+	case ShowStatsMsg:
+		a.screen = NewStatsScreen(msg.Result, msg.Filter, a.width, a.height)
+		return a, nil
+
+	// User navigates back from stats to results.
+	case BackFromStatsMsg:
+		a.screen = NewResultsScreen(a.lastResult, a.lastFilter, a.cfg, a.width, a.height)
+		return a, nil
 	}
 
 	if a.showHelp {
@@ -240,6 +251,7 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 	}
 }
 
+
 // ── help overlay ──────────────────────────────────────────────────────────────
 
 var (
@@ -273,6 +285,7 @@ func helpView(width, height int) string {
 		"  enter           open detail",
 		"  tab / shift+tab  focus filter panel",
 		"  ctrl+r          refresh (re-run search)",
+		"  ctrl+t          open statistics screen",
 		"  /                inline text filter",
 		"  e                export to NDJSON file",
 		"  c                copy selected row JSON",

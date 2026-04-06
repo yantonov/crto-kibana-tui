@@ -273,6 +273,10 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 		rs.filterInput.Focus()
 		rs.tbl = rs.buildTable(rs.visibleEntries())
 		return rs, textinput.Blink
+
+	case "ctrl+t":
+		f, r := rs.filter, rs.result
+		return rs, func() tea.Msg { return ShowStatsMsg{Filter: f, Result: r} }
 	}
 
 	var cmd tea.Cmd
@@ -417,7 +421,7 @@ func (rs ResultsScreen) statusBar() string {
 	if rs.notice != "" {
 		right = rs.notice
 	} else {
-		right = "↑↓/jk navigate · enter detail · / filter · tab edit filters · ctrl+r refresh · e export · c copy · ctrl+c quit"
+		right = "↑↓/jk navigate · enter detail · / filter · tab edit filters · ctrl+r refresh · e export · c copy · ctrl+t stats · ctrl+c quit"
 	}
 
 	left := dcSection + "  " + count + "    "
