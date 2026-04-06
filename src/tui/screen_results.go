@@ -181,6 +181,7 @@ func (rs ResultsScreen) View() string {
 		parts = append(parts, "  / "+resultsFilterInput.Render(rs.filterInput.View()))
 	}
 	parts = append(parts, rs.tbl.View())
+	parts = append(parts, "")
 	parts = append(parts, rs.statusBar())
 
 	return strings.Join(parts, "\n")
@@ -344,11 +345,11 @@ func (rs ResultsScreen) filterPanelLines() int {
 }
 
 func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
-	// filter summary (1) + table header with border (2) + status bar (1) = 4 base overhead.
+	// filter summary (1) + table header with border (2) + blank line (1) + status bar (1) = 5 base overhead.
 	// WithStyles must be applied before WithHeight so viewport.Height is calculated
 	// using the actual header height (2 lines with BorderBottom), keeping the table
 	// strictly shorter than the terminal and the filter summary / status bar always visible.
-	overhead := 4
+	overhead := 5
 	if rs.filterFocused {
 		overhead = rs.filterPanelLines() + 2
 	}
@@ -387,7 +388,7 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 			e.Severity,
 			e.DataCenter,
 			e.Application,
-			truncate(e.Message, msgWidth),
+			truncate(stripNewlines(e.Message), msgWidth),
 		}
 	}
 
@@ -432,6 +433,8 @@ func (rs ResultsScreen) statusBar() string {
 	var right string
 	if rs.notice != "" {
 		right = rs.notice
+	} else if len(rs.result.DCErrors) > 0 {
+		right = resultsDCErr.Render(fmt.Sprintf("%d DC error(s) — ctrl+r to retry", len(rs.result.DCErrors)))
 	} else {
 		right = "F1 help"
 	}
@@ -500,6 +503,10 @@ func (rs ResultsScreen) resultsHelpView() string {
 	}
 	box := helpBoxStyle.Render(strings.Join(lines, "\n"))
 	return lipgloss.Place(rs.width, rs.height, lipgloss.Center, lipgloss.Center, box)
+}
+
+func stripNewlines(s string) string {
+	return strings.NewReplacer("\r", " ", "\n", " ").Replace(s)
 }
 
 func truncate(s string, n int) string {
