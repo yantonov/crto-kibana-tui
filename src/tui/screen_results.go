@@ -363,10 +363,10 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 
 	const (
 		tsWidth  = 20
-		sevWidth = 14
-		dcWidth  = 8
+		sevWidth = 1
+		dcWidth  = 3
 		appWidth = 20
-		gaps     = 10
+		gaps     = 5
 	)
 	msgWidth := rs.width - tsWidth - sevWidth - dcWidth - appWidth - gaps
 	if msgWidth < 20 {
@@ -375,7 +375,7 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 
 	cols := []table.Column{
 		{Title: "Timestamp", Width: tsWidth},
-		{Title: "Severity", Width: sevWidth},
+		{Title: "Lev", Width: sevWidth},
 		{Title: "DC", Width: dcWidth},
 		{Title: "Application", Width: appWidth},
 		{Title: "Message", Width: msgWidth},
@@ -388,12 +388,14 @@ func (rs ResultsScreen) buildTable(entries []models.LogEntry) table.Model {
 			e.Severity,
 			e.DataCenter,
 			e.Application,
-			truncate(stripNewlines(e.Message), msgWidth),
+			truncate(stripNewlines(e.Message), msgWidth-2),
 		}
 	}
 
 	s := table.DefaultStyles()
+	s.Cell = s.Cell.Padding(0, 0, 0, 1)
 	s.Header = s.Header.
+		Padding(0, 0, 0, 1).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#6B7280")).
 		BorderBottom(true).
