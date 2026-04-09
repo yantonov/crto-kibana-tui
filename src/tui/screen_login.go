@@ -171,7 +171,7 @@ func (l LoginScreen) row(label string, ti textinput.Model, focused bool) string 
 	} else {
 		wrapped = loginInputBlurred.Render(ti.View())
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	return lipgloss.JoinHorizontal(lipgloss.Center,
 		loginLabelStyle.Render(label)+"  ",
 		wrapped,
 	)

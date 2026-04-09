@@ -422,7 +422,7 @@ func (f FilterScreen) triggerSearch() tea.Cmd {
 }
 
 func (f FilterScreen) row(label, field string) string {
-	return lipgloss.JoinHorizontal(lipgloss.Top,
+	return lipgloss.JoinHorizontal(lipgloss.Center,
 		labelStyle.Render(label)+"  ",
 		field,
 	)
