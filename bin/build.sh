@@ -1,10 +1,11 @@
 #!/usr/bin/env sh
 set -o errexit -o nounset
 
-cd "$(dirname "$0")/.."
+. "$(dirname -- "$0")/common.sh"
 
-MODULE=$(go list -m)
-APP=$(basename "$MODULE")
+mkdir -p "$TARGET_DIR"
 
-go build -o target/"$APP" ./src
-echo "Built target/$APP"
+# -trimpath keeps absolute build paths out of the binary.
+go build -trimpath -o "$BINARY" ./src
+
+echo "Built $BINARY"

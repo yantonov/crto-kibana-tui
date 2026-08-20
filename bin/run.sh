@@ -1,9 +1,9 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env sh
+set -o errexit -o nounset
 
-cd "$(dirname "$0")/.."
+. "$(dirname -- "$0")/common.sh"
 
-MODULE=$(go list -m)
-APP=$(basename "$MODULE")
+# Always run what the working tree currently says.
+"$ROOT_DIR/bin/build.sh"
 
-./target/"$APP" "$@"
+exec "$BINARY" "$@"
