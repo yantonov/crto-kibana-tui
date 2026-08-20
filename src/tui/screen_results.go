@@ -229,7 +229,7 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	rs.notice = "" // clear previous notice on any keypress
 
 	switch msg.String() {
-	case "tab":
+	case "tab", "esc":
 		rs.filterPanel = NewFilterScreenFromFilter(rs.cfg, rs.filter)
 		rs.filterPanel.FocusFirst()
 		rs.filterFocused = true
@@ -476,7 +476,7 @@ func (rs ResultsScreen) filterSummary() string {
 	}
 	line += fmt.Sprintf("  timeframe:%s", hi(f.Timeframe))
 	if f.Environment == "" {
-		line = "tab to configure filters · ctrl+s to search"
+		line = "tab/esc to configure filters · ctrl+s to search"
 	}
 	return filterSummaryStyle.Width(rs.width).Render(line)
 }
@@ -491,7 +491,8 @@ func (rs ResultsScreen) resultsHelpView() string {
 		"",
 		helpSectionStyle.Render("Filters"),
 		"  /                inline text filter",
-		"  tab / shift+tab  focus filter panel",
+		"  tab / esc        focus filter panel",
+		"  shift+tab        focus filter panel (last field)",
 		"  ctrl+r           refresh (re-run search)",
 		"",
 		helpSectionStyle.Render("Actions"),
