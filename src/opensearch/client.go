@@ -4,11 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 )
+
+// ErrInvalidCredentials reports credentials the Kibana auth endpoint rejected,
+// as opposed to a transport or server-side failure. Callers distinguish the two
+// to decide whether retrying with the same credentials could ever succeed.
+var ErrInvalidCredentials = errors.New("invalid credentials")
 
 // Client is a thin HTTP wrapper for the OpenSearch _search API.
 type Client struct {
@@ -43,7 +49,7 @@ func (c *Client) Login(ctx context.Context, kibanaURL, username, password string
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("invalid credentials")
+		return ErrInvalidCredentials
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -90,7 +96,7 @@ func (c *Client) Ping(ctx context.Context, kibanaURL string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusUnauthorized {
-		return fmt.Errorf("invalid credentials (HTTP 401)")
+		return ErrInvalidCredentials
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/yantonov/crtokt/src/config"
+	"github.com/yantonov/crtokt/src/credentials"
 	"github.com/yantonov/crtokt/src/models"
 	"github.com/yantonov/crtokt/src/opensearch"
 )
@@ -20,6 +22,13 @@ import (
 type App struct {
 	cfg    config.Provider
 	client opensearch.Searcher
+	store  credentials.Store
+
+	// stored is what the keychain held at startup; pending is the pair the
+	// in-flight login is using. They differ once the user types new
+	// credentials, which is exactly when the keychain needs rewriting.
+	stored  credentials.Credentials
+	pending credentials.Credentials
 
 	screen   Screen
 	showHelp bool
@@ -37,21 +46,44 @@ type App struct {
 	spinner spinner.Model
 }
 
-// New constructs the root App model.
-func New(cfg config.Provider, client opensearch.Searcher) App {
+// New constructs the root App model. Credentials already in the keychain are
+// used to log in without showing the form; anything else — nothing stored, a
+// half-filled pair, an unreadable keychain — falls back to the login screen.
+func New(cfg config.Provider, client opensearch.Searcher, store credentials.Store) App {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#7C3AED"))
-	return App{
+
+	stored, err := store.Load()
+	login := NewLoginScreen(stored.Username)
+	if err != nil {
+		login.errMsg = "keychain: " + err.Error()
+		stored = credentials.Credentials{}
+	}
+
+	app := App{
 		cfg:     cfg,
 		client:  client,
-		screen:  NewLoginScreen(),
+		store:   store,
+		stored:  stored,
+		screen:  login,
 		spinner: s,
 	}
+	if stored.Complete() {
+		app.pending = stored
+		app.loading = true
+	}
+	return app
 }
 
-// Init satisfies tea.Model.
+// Init satisfies tea.Model. When startup credentials were found it kicks off
+// the automatic login instead of waiting for the form to be submitted.
 func (a App) Init() tea.Cmd {
+	if a.loading {
+		// The form is still initialised: it is what the user lands on when the
+		// stored credentials turn out not to work.
+		return tea.Batch(a.screen.Init(), a.doLogin(a.pending), a.spinner.Tick)
+	}
 	return a.screen.Init()
 }
 
@@ -90,17 +122,45 @@ func (a App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// User submitted the login form.
 	case LoginSubmitMsg:
 		a.loading = true
-		return a, tea.Batch(a.doLogin(msg.Username, msg.Password), a.spinner.Tick)
+		a.pending = credentials.Credentials{Username: msg.Username, Password: msg.Password}
+		return a, tea.Batch(a.doLogin(a.pending), a.spinner.Tick)
 
-	// Login succeeded — show the results page with the filter panel ready for input.
+	// Login succeeded — show the results page with the filter panel ready for
+	// input. A failed keychain write is reported there but does not block use.
 	case LoginDoneMsg:
 		a.loading = false
-		a.screen = NewInitialResultsScreen(a.cfg, a.width, a.height)
-		return a, tea.Batch(clearScreenCmd(), a.screen.Init())
+		a.stored = a.pending
+		results := NewInitialResultsScreen(a.cfg, a.width, a.height)
+		if msg.SaveErr != nil {
+			results.notice = "keychain: " + msg.SaveErr.Error()
+		}
+		a.screen = results
+		return a, tea.Batch(clearScreenCmd(), results.Init())
 
 	// Login failed — delegate to the login screen so it can display the error.
+	// An automatic login leaves the form blank, so put the password back unless
+	// it is the password that was rejected.
 	case loginErrMsg:
 		a.loading = false
+		if login, ok := a.screen.(LoginScreen); ok &&
+			login.passwordInput.Value() == "" &&
+			!errors.Is(msg.err, opensearch.ErrInvalidCredentials) {
+			login.setPassword(a.pending.Password)
+			a.screen = login
+		}
+		model, cmd := a.screen.Update(msg)
+		a.screen = model
+		return a, cmd
+
+	// User asked the login form to forget the stored credentials.
+	case ClearStoredCredentialsMsg:
+		return a, a.doClearCredentials()
+
+	case credentialsClearedMsg:
+		if msg.err == nil {
+			a.stored = credentials.Credentials{}
+			a.pending = credentials.Credentials{}
+		}
 		model, cmd := a.screen.Update(msg)
 		a.screen = model
 		return a, cmd
@@ -216,10 +276,13 @@ func (a App) loadingView() string {
 	return bar + msg
 }
 
-// doLogin performs the authentication request as a tea.Cmd.
-func (a App) doLogin(username, password string) tea.Cmd {
+// doLogin performs the authentication request as a tea.Cmd, persisting the
+// credentials once they are known to work.
+func (a App) doLogin(creds credentials.Credentials) tea.Cmd {
 	cfg := a.cfg
 	client := a.client
+	store := a.store
+	stored := a.stored
 	return func() tea.Msg {
 		// Use the first available DC to authenticate.
 		var kibanaURL string
@@ -234,10 +297,21 @@ func (a App) doLogin(username, password string) tea.Cmd {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		if err := client.Login(ctx, kibanaURL, username, password); err != nil {
+		if err := client.Login(ctx, kibanaURL, creds.Username, creds.Password); err != nil {
 			return loginErrMsg{err: err}
 		}
-		return LoginDoneMsg{}
+		if creds == stored {
+			return LoginDoneMsg{}
+		}
+		return LoginDoneMsg{SaveErr: store.Save(creds)}
+	}
+}
+
+// doClearCredentials wipes the keychain entries as a tea.Cmd.
+func (a App) doClearCredentials() tea.Cmd {
+	store := a.store
+	return func() tea.Msg {
+		return credentialsClearedMsg{err: store.Clear()}
 	}
 }
 

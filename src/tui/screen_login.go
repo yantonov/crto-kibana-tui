@@ -31,6 +31,9 @@ var (
 	loginErrStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#EF4444"))
 
+	loginNoteStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#34D399"))
+
 	loginInputFocused = lipgloss.NewStyle().
 				BorderStyle(lipgloss.RoundedBorder()).
 				BorderForeground(lipgloss.Color("#7C3AED")).
@@ -50,13 +53,15 @@ type LoginScreen struct {
 	height   int
 	focusIdx int
 	errMsg   string
+	noteMsg  string
 
 	usernameInput textinput.Model
 	passwordInput textinput.Model
 }
 
-// NewLoginScreen constructs a LoginScreen.
-func NewLoginScreen() LoginScreen {
+// NewLoginScreen constructs a LoginScreen. username pre-fills the first field
+// when it is known — typically the value read from the keychain.
+func NewLoginScreen(username string) LoginScreen {
 	userIn := textinput.New()
 	userIn.Placeholder = "username"
 	userIn.CharLimit = 128
@@ -69,10 +74,13 @@ func NewLoginScreen() LoginScreen {
 	passIn.EchoMode = textinput.EchoPassword
 	passIn.EchoCharacter = '•'
 
+	if username == "" {
+		username = os.Getenv("USER")
+	}
+
 	focusIdx := loginFieldUsername
-	envUser := os.Getenv("USER")
-	if envUser != "" {
-		userIn.SetValue(envUser)
+	if username != "" {
+		userIn.SetValue(username)
 		focusIdx = loginFieldPassword
 		passIn.Focus()
 	} else {
@@ -96,6 +104,20 @@ func (l LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case loginErrMsg:
 		l.errMsg = msg.err.Error()
+		l.noteMsg = ""
+		return l, nil
+
+	case credentialsClearedMsg:
+		if msg.err != nil {
+			l.errMsg = "keychain: " + msg.err.Error()
+			return l, nil
+		}
+		l.usernameInput.SetValue("")
+		l.passwordInput.SetValue("")
+		l.focusIdx = loginFieldUsername
+		l.syncFocus()
+		l.errMsg = ""
+		l.noteMsg = "stored credentials removed"
 		return l, nil
 
 	case tea.WindowSizeMsg:
@@ -115,6 +137,8 @@ func (l LoginScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return l, nil
 		case "enter", "ctrl+s":
 			return l, l.submit()
+		case "ctrl+x":
+			return l, clearStoredCredentialsCmd
 		}
 	}
 
@@ -129,7 +153,7 @@ func (l LoginScreen) View() string {
 		l.row("Password", l.passwordInput, l.focusIdx == loginFieldPassword),
 	}
 
-	help := loginHelpStyle.Render("enter  login  ·  tab  next field  ·  ctrl+c  quit")
+	help := loginHelpStyle.Render("enter  login  ·  tab  next field  ·  ctrl+x  forget saved  ·  ctrl+c  quit")
 
 	parts := []string{
 		loginTitleStyle.Render("crtokt — Log Viewer"),
@@ -140,6 +164,9 @@ func (l LoginScreen) View() string {
 	}
 	if l.errMsg != "" {
 		parts = append(parts, "", loginErrStyle.Render("  "+l.errMsg))
+	}
+	if l.noteMsg != "" {
+		parts = append(parts, "", loginNoteStyle.Render("  "+l.noteMsg))
 	}
 
 	return lipgloss.NewStyle().Padding(1, 2).Render(strings.Join(parts, "\n"))
@@ -153,6 +180,12 @@ func (l *LoginScreen) syncFocus() {
 		l.usernameInput.Blur()
 		l.passwordInput.Focus()
 	}
+}
+
+// setPassword restores a password into the form, used when an automatic login
+// failed for a reason other than the credentials themselves.
+func (l *LoginScreen) setPassword(password string) {
+	l.passwordInput.SetValue(password)
 }
 
 func (l LoginScreen) submit() tea.Cmd {

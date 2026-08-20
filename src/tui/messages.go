@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/yantonov/crtokt/src/models"
+import (
+	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/yantonov/crtokt/src/models"
+)
 
 // ── messages sent from screens up to App ─────────────────────────────────────
 
@@ -9,6 +13,14 @@ type LoginSubmitMsg struct {
 	Username string
 	Password string
 }
+
+// ClearStoredCredentialsMsg is sent when the user asks the login form to forget
+// the credentials held in the keychain.
+type ClearStoredCredentialsMsg struct{}
+
+// clearStoredCredentialsCmd emits ClearStoredCredentialsMsg. The keychain write
+// itself belongs to App, which owns the store.
+func clearStoredCredentialsCmd() tea.Msg { return ClearStoredCredentialsMsg{} }
 
 // SearchStartedMsg is sent when the user triggers a search from the filter screen.
 type SearchStartedMsg struct {
@@ -47,8 +59,13 @@ type SearchDoneMsg struct {
 	Filter models.Filter
 }
 
-// LoginDoneMsg is sent when the login request succeeds.
-type LoginDoneMsg struct{}
+// LoginDoneMsg is sent when the login request succeeds. SaveErr carries the
+// failure of the follow-up keychain write, which does not invalidate the
+// session that was just established.
+type LoginDoneMsg struct{ SaveErr error }
 
 // loginErrMsg is sent when the login request fails.
 type loginErrMsg struct{ err error }
+
+// credentialsClearedMsg reports the outcome of wiping the keychain entries.
+type credentialsClearedMsg struct{ err error }
