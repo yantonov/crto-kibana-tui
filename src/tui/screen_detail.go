@@ -34,9 +34,9 @@ var (
 			Foreground(lipgloss.Color("#374151"))
 
 	detailStatusBar = lipgloss.NewStyle().
-				Background(lipgloss.Color("#1F2937")).
-				Foreground(lipgloss.Color("#F9FAFB")).
-				Padding(0, 1)
+			Background(lipgloss.Color("#1F2937")).
+			Foreground(lipgloss.Color("#F9FAFB")).
+			Padding(0, 1)
 )
 
 // DetailScreen shows the full content of a single log entry.

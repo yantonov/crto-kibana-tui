@@ -22,10 +22,10 @@ var Global = GlobalKeyMap{
 
 // FilterKeyMap holds key bindings for the filter screen.
 type FilterKeyMap struct {
-	Next   key.Binding
-	Prev   key.Binding
+	Next    key.Binding
+	Prev    key.Binding
 	Confirm key.Binding
-	Search key.Binding
+	Search  key.Binding
 }
 
 // FilterKeys is the singleton filter key map.
@@ -103,12 +103,12 @@ var ResultsKeys = ResultsKeyMap{
 
 // DetailKeyMap holds key bindings for the detail screen.
 type DetailKeyMap struct {
-	Up      key.Binding
-	Down    key.Binding
-	Toggle  key.Binding
-	Copy    key.Binding
-	Open    key.Binding
-	Back    key.Binding
+	Up     key.Binding
+	Down   key.Binding
+	Toggle key.Binding
+	Copy   key.Binding
+	Open   key.Binding
+	Back   key.Binding
 }
 
 // DetailKeys is the singleton detail key map.

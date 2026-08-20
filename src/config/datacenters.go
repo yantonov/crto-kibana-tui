@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	dcFileName   = "datacenters.yaml"
+	dcFileName     = "datacenters.yaml"
 	dcFetchTimeout = 15 * time.Second
 )
 

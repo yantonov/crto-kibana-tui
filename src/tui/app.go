@@ -325,7 +325,6 @@ func (a App) doSearch(filter models.Filter) tea.Cmd {
 	}
 }
 
-
 // clearScreenCmd returns a tea.Cmd that clears the terminal before the next render,
 // preventing stale content from a previous (taller) screen from bleeding through.
 func clearScreenCmd() tea.Cmd {

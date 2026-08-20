@@ -47,10 +47,10 @@ var (
 
 // ResultsScreen displays the filter panel and merged search results together.
 type ResultsScreen struct {
-	result  models.CombinedResult
-	filter  models.Filter
-	allDCs  []string // sorted list of all DCs that were searched
-	ready   bool     // true after NewResultsScreen has been called
+	result models.CombinedResult
+	filter models.Filter
+	allDCs []string // sorted list of all DCs that were searched
+	ready  bool     // true after NewResultsScreen has been called
 
 	tbl         table.Model
 	filterInput textinput.Model
