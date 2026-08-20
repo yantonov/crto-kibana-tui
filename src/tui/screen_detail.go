@@ -104,6 +104,8 @@ func (ds DetailScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ds.notice = "opening Kibana…"
 			}
 			return ds, nil
+		case "q":
+			return ds, tea.Quit
 		}
 	}
 
@@ -181,7 +183,7 @@ func (ds DetailScreen) statusBar() string {
 	if ds.rawView {
 		toggle = "r formatted"
 	}
-	keys := fmt.Sprintf("↑↓/jk scroll · %s · c copy · o kibana · esc/b back", toggle)
+	keys := fmt.Sprintf("↑↓/jk scroll · %s · c copy · o kibana · esc/b back · q quit", toggle)
 	return detailStatusBar.Width(ds.width).Render(keys)
 }
 

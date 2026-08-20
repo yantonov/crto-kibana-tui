@@ -35,6 +35,7 @@ var (
 	escKey   = tea.KeyMsg{Type: tea.KeyEsc}
 	tabKey   = tea.KeyMsg{Type: tea.KeyTab}
 	slashKey = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}}
+	qKey     = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}}
 )
 
 func TestEscFromTheResultsTableFocusesTheFilterPanel(t *testing.T) {
@@ -88,5 +89,54 @@ func TestEscClosesTheInlineFilterWithoutOpeningTheFilterPanel(t *testing.T) {
 	}
 	if rs.filterFocused {
 		t.Fatal("esc closing the inline filter should not also open the filter panel")
+	}
+}
+
+// isQuit reports whether a command resolves to tea's quit message.
+func isQuit(cmd tea.Cmd) bool {
+	if cmd == nil {
+		return false
+	}
+	_, quit := cmd().(tea.QuitMsg)
+	return quit
+}
+
+func TestQQuitsFromTheResultsTable(t *testing.T) {
+	rs := resultsScreen(t)
+
+	_, cmd := rs.Update(qKey)
+
+	if !isQuit(cmd) {
+		t.Fatal("q on the results table should quit")
+	}
+}
+
+func TestQIsTypedIntoTheInlineFilterRatherThanQuitting(t *testing.T) {
+	rs := press(t, resultsScreen(t), slashKey)
+
+	next, cmd := rs.Update(qKey)
+	rs = next.(ResultsScreen)
+
+	if isQuit(cmd) {
+		t.Fatal("q should not quit while the inline filter is open")
+	}
+	if got := rs.filterInput.Value(); got != "q" {
+		t.Fatalf("inline filter holds %q, want %q", got, "q")
+	}
+}
+
+func TestQIsTypedIntoTheFilterPanelQueryFieldRatherThanQuitting(t *testing.T) {
+	rs := press(t, resultsScreen(t), escKey)
+	rs.filterPanel.focusIdx = fieldQuery
+	rs.filterPanel.syncFocus()
+
+	next, cmd := rs.Update(qKey)
+	rs = next.(ResultsScreen)
+
+	if isQuit(cmd) {
+		t.Fatal("q should not quit while a filter field has focus")
+	}
+	if got := rs.filterPanel.queryInput.Value(); got != "q" {
+		t.Fatalf("query field holds %q, want %q", got, "q")
 	}
 }

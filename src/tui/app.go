@@ -380,7 +380,7 @@ func helpView(width, height int) string {
 		"",
 		helpSectionStyle.Render("Global"),
 		"  ?                toggle this help",
-		"  ctrl+c           quit",
+		"  q / ctrl+c       quit  (not while typing in a field)",
 	}
 	box := helpBoxStyle.Render(strings.Join(lines, "\n"))
 	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, box)

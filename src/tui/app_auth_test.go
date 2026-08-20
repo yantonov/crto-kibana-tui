@@ -266,3 +266,17 @@ func TestForgettingCredentialsWipesTheKeychainAndTheForm(t *testing.T) {
 		t.Fatal("app still holds the cleared credentials")
 	}
 }
+
+func TestQIsTypedIntoTheLoginFormRatherThanQuitting(t *testing.T) {
+	t.Setenv("USER", "") // keep the focus on the username field
+	a := New(stubConfig{}, &stubSearcher{}, &stubStore{})
+
+	next, cmd := updateCmd(t, a, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
+
+	if isQuit(cmd) {
+		t.Fatal("q should not quit while the login form is up")
+	}
+	if got := loginScreen(t, next).usernameInput.Value(); got != "q" {
+		t.Fatalf("username field holds %q, want %q", got, "q")
+	}
+}

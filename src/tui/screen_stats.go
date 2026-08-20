@@ -93,6 +93,8 @@ func (ss StatsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "b":
 			return ss, func() tea.Msg { return BackFromStatsMsg{} }
+		case "q":
+			return ss, tea.Quit
 		}
 	}
 
@@ -218,7 +220,7 @@ func (ss StatsScreen) bottomSection() string {
 }
 
 func (ss StatsScreen) statusBar() string {
-	return StatusBar.Width(ss.width).Render("↑↓/jk scroll · esc/b back · ctrl+c quit")
+	return StatusBar.Width(ss.width).Render("↑↓/jk scroll · esc/b back · q quit")
 }
 
 // ── computation helpers ───────────────────────────────────────────────────────

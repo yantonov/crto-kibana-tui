@@ -290,6 +290,9 @@ func (rs ResultsScreen) handleKey(msg tea.KeyMsg) (ResultsScreen, tea.Cmd) {
 	case "f1":
 		rs.showHelp = true
 		return rs, nil
+
+	case "q":
+		return rs, tea.Quit
 	}
 
 	var cmd tea.Cmd
@@ -502,7 +505,7 @@ func (rs ResultsScreen) resultsHelpView() string {
 		"",
 		helpSectionStyle.Render("Global"),
 		"  F1               toggle this help",
-		"  ctrl+c           quit",
+		"  q / ctrl+c       quit",
 	}
 	box := helpBoxStyle.Render(strings.Join(lines, "\n"))
 	return lipgloss.Place(rs.width, rs.height, lipgloss.Center, lipgloss.Center, box)
