@@ -1,4 +1,4 @@
-.PHONY: help build run test lint check install uninstall clean
+.PHONY: help help-all build run test lint check install uninstall clean
 
 .DEFAULT_GOAL := help
 
@@ -8,15 +8,29 @@ BINARY      := $(TARGET)/$(APP)
 INSTALL_DIR ?= $(HOME)/.local/bin
 
 help:
-	@echo "Available targets:"
-	@echo "  build      compile binary to target/"
-	@echo "  run        build then run (pass args via ARGS=...)"
-	@echo "  test       run tests"
-	@echo "  lint       run go vet + gofmt check"
-	@echo "  check      run lint + test"
-	@echo "  install    copy binary to \$$INSTALL_DIR/"
-	@echo "  uninstall  remove binary from \$$INSTALL_DIR/"
-	@echo "  clean      remove compiled binary"
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "  check      - Run lint + test"
+	@echo "  build      - Compile binary to target/"
+	@echo "  run        - Build then run (pass args via ARGS=...)"
+	@echo "  test       - Run tests"
+	@echo "  install    - Copy binary to \$$INSTALL_DIR/"
+	@echo "  uninstall  - Remove binary from \$$INSTALL_DIR/"
+	@echo ""
+	@echo "Run 'make help-all' for the full list, including internal targets."
+
+help-all:
+	@echo "Public targets:"
+	@echo "  check      - Run lint + test"
+	@echo "  build      - Compile binary to target/"
+	@echo "  run        - Build then run (pass args via ARGS=...)"
+	@echo "  test       - Run tests"
+	@echo "  install    - Copy binary to \$$INSTALL_DIR/"
+	@echo "  uninstall  - Remove binary from \$$INSTALL_DIR/"
+	@echo ""
+	@echo "Internal targets (typically called via check):"
+	@echo "  lint       - Run go vet + gofmt check"
+	@echo "  clean      - Remove compiled binary"
 
 build:
 	@mkdir -p $(TARGET)
