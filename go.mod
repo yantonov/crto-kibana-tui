@@ -1,6 +1,6 @@
 module github.com/yantonov/crtokt
 
-go 1.25.0
+go 1.26.10
 
 require (
 	github.com/atotto/clipboard v0.1.4
